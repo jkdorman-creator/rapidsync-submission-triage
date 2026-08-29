@@ -147,6 +147,8 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 .field__input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 .field__src { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .field--missing .field__input { border-color: color-mix(in srgb, var(--stop) 45%, var(--line)); }
+.field--toquote .field__input { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); border-style: dashed; }
+.req--quote { color: var(--warn); }
 .field--asked { background: color-mix(in srgb, var(--ask) 12%, transparent); }
 .field--asked .field__input { border-color: var(--ask); }
 @keyframes flashfill {
@@ -368,12 +370,21 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 .reply__note { margin: 11px 0 0; font-size: 11.5px; color: var(--muted); }
 .reply__sent { font-size: 12.5px; font-weight: 550; color: var(--ok); }
 
+/* ---- empty workspace: tell the visitor what to do ---------------------- */
+.empty { padding: 26px 4px; }
+.empty__h { font-size: 17px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 8px; }
+.empty__p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 62ch; }
+
 
 /* ---- hosted preview only: the scripted agent -------------------------- */
 .playerbar {
   padding: 11px 22px; background: var(--panel); border-bottom: 1px solid var(--line);
 }
-.playerbar__row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.playerbar__row { display: flex; align-items: stretch; gap: 9px; flex-wrap: wrap; }
+.btn--play { flex: 0 1 250px; }
+.btn--play:hover { border-color: var(--accent); }
+.btn--play[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.playerbar__label { align-self: center; }
 .playerbar__label {
   font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
   font-weight: 650; color: var(--muted); margin-right: 3px;
@@ -435,10 +446,19 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 
 <div class="playerbar">
   <div class="playerbar__row">
-    <span class="playerbar__label">Watch the agent work</span>
-    <button type="button" class="btn btn--ghost" data-play="clean">A clean one</button>
-    <button type="button" class="btn btn--primary" data-play="problem">One with a problem</button>
-    <button type="button" class="btn btn--ghost" data-play="decline">One we cannot write</button>
+    <span class="playerbar__label">Pick one to watch</span>
+    <button type="button" class="btn btn--choice btn--play" data-play="clean">
+      <span class="btn__label">A clean one</span>
+      <span class="btn__detail">Everything is there. It still asks before it acts.</span>
+    </button>
+    <button type="button" class="btn btn--choice btn--play" data-play="problem">
+      <span class="btn__label">One with a problem</span>
+      <span class="btn__detail">Two documents disagree. Only you can settle it.</span>
+    </button>
+    <button type="button" class="btn btn--choice btn--play" data-play="decline">
+      <span class="btn__label">One we cannot write</span>
+      <span class="btn__detail">Out of appetite. Out in twenty seconds.</span>
+    </button>
     <button type="button" class="btn btn--ghost" id="reset">Reset</button>
   </div>
   <p class="playerbar__note">
@@ -545,37 +565,38 @@ if (!('modelContext' in document)) {
 // ---------------------------------------------------------------------------
 
 const FIELDS = [
-  { key: 'named_insured',      label: 'Named insured',        group: 'Applicant', required: true,  type: 'text',
+  { key: 'named_insured',      label: 'Named insured',        group: 'Applicant', needed: 'indicate', type: 'text',
     why: 'The policy is issued in this exact legal name. A quote in the wrong name has to be reissued.' },
-  { key: 'fein',               label: 'FEIN',                 group: 'Applicant', required: true,  type: 'text',
+  { key: 'fein',               label: 'FEIN',                 group: 'Applicant', needed: 'quote',    type: 'text',
     why: 'Carriers bind and file the policy on the FEIN, and it is how the experience mod is verified with the rating bureau. Without it this cannot be rated, and a quote issued against the wrong entity has to be pulled.' },
-  { key: 'entity_type',        label: 'Entity type',          group: 'Applicant', required: false, type: 'text' },
-  { key: 'state',              label: 'State(s) of operation',group: 'Applicant', required: true,  type: 'text',
+  { key: 'entity_type',        label: 'Entity type',          group: 'Applicant', needed: 'quote',    type: 'text',
+    why: 'Decides how owners and officers are included or excluded, which changes the payroll we rate on.' },
+  { key: 'state',              label: 'State(s) of operation',group: 'Applicant', needed: 'indicate', type: 'text',
     why: 'Rates, forms and the governing rating bureau all change by state.' },
-  { key: 'years_in_business',  label: 'Years in business',    group: 'Applicant', required: false, type: 'number' },
+  { key: 'years_in_business',  label: 'Years in business',    group: 'Applicant', needed: null,       type: 'number' },
 
-  { key: 'effective_date',     label: 'Effective date',       group: 'Coverage',  required: true,  type: 'text',
+  { key: 'effective_date',     label: 'Effective date',       group: 'Coverage',  needed: 'indicate', type: 'text',
     why: 'Sets which rate filing applies, and whether we can even meet the date.' },
-  { key: 'experience_mod',     label: 'Experience mod',       group: 'Coverage',  required: true,  type: 'number',
+  { key: 'experience_mod',     label: 'Experience mod',       group: 'Coverage',  needed: 'indicate', type: 'number',
     why: 'Multiplies the manual premium, and it is the first appetite test. Guessing at it produces a quote we cannot stand behind.' },
 
-  { key: 'governing_class',    label: 'Governing class code', group: 'Exposure',  required: true,  type: 'text',
+  { key: 'governing_class',    label: 'Governing class code', group: 'Exposure',  needed: 'indicate', type: 'text',
     why: 'The class carrying the most payroll decides the base rate and whether the risk is in appetite at all.' },
-  { key: 'class_description',  label: 'Class description',    group: 'Exposure',  required: false, type: 'text' },
-  { key: 'annual_payroll',     label: 'Total annual payroll', group: 'Exposure',  required: true,  type: 'money',
+  { key: 'class_description',  label: 'Class description',    group: 'Exposure',  needed: null,       type: 'text' },
+  { key: 'annual_payroll',     label: 'Total annual payroll', group: 'Exposure',  needed: 'indicate', type: 'money',
     why: 'Premium is rated per $100 of payroll. No payroll, no premium.' },
-  { key: 'employee_count',     label: 'Employee count',       group: 'Exposure',  required: true,  type: 'number',
+  { key: 'employee_count',     label: 'Employee count',       group: 'Exposure',  needed: 'indicate', type: 'number',
     why: 'Sanity-checks the payroll and drives which carriers will look at it.' },
 
-  { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', required: true, type: 'yesno',
+  { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', needed: 'indicate', type: 'yesno',
     why: 'What the application itself says about past losses. We leave it as written even when a loss run disagrees, so the disagreement stays on the file.' },
-  { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', required: true, type: 'number',
+  { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', needed: 'indicate', type: 'number',
     why: 'Three years is the minimum to firm up a quote. Fewer means an indication at best.' },
-  { key: 'loss_run_claims',    label: 'Claims shown on loss runs',       group: 'Loss history', required: false, type: 'number' },
-  { key: 'loss_run_incurred',  label: 'Total incurred on loss runs',     group: 'Loss history', required: false, type: 'money' },
+  { key: 'loss_run_claims',    label: 'Claims shown on loss runs',       group: 'Loss history', needed: null,       type: 'number' },
+  { key: 'loss_run_incurred',  label: 'Total incurred on loss runs',     group: 'Loss history', needed: null,       type: 'money' },
 
-  { key: 'agency_name',        label: 'Producing agency',     group: 'Producer',  required: false, type: 'text' },
-  { key: 'agent_email',        label: 'Producer email',       group: 'Producer',  required: false, type: 'text' },
+  { key: 'agency_name',        label: 'Producing agency',     group: 'Producer',  needed: null,       type: 'text' },
+  { key: 'agent_email',        label: 'Producer email',       group: 'Producer',  needed: null,       type: 'text' },
 ];
 
 const FIELD_KEYS = FIELDS.map(f => f.key);
@@ -583,6 +604,7 @@ const byKey = Object.fromEntries(FIELDS.map(f => [f.key, f]));
 const fieldLabel = k => (byKey[k] ? byKey[k].label : k);
 const fieldType  = k => (byKey[k] ? byKey[k].type : 'text');
 const fieldWhy   = k => (byKey[k] ? byKey[k].why : null);
+const fieldNeeded = k => (byKey[k] ? byKey[k].needed : null);
 
 // --- RapidSync WC appetite. Deterministic, and visible to the underwriter. ---
 const PROHIBITED_CLASSES = {
@@ -598,7 +620,7 @@ const MIN_LOSS_RUN_YEARS = 3;
 
 const LANES = {
   quote_now:     { label: 'Quote Now',     blurb: 'Everything checks out. Send it to rating.' },
-  indication:    { label: 'Indication',    blurb: 'Enough to price a ballpark, not enough to bind.' },
+  indication:    { label: 'Indication',    blurb: 'Enough to price a ballpark. Ask the producer for the rest.' },
   send_for_info: { label: 'Send for Info', blurb: 'Go back to the producer before anything else.' },
   likely_decline:{ label: 'Likely Decline',blurb: 'Outside appetite. Decline politely and fast.' },
 };
@@ -656,10 +678,17 @@ const num = v => {
 
 // --- The rules engine -------------------------------------------------------
 function evaluate(record = state.record) {
-  const missing = FIELDS.filter(f => f.required && isBlank(record[f.key])).map(f => f.key);
+  // Two thresholds, not one. You can price a ballpark on less than you need to
+  // put a firm number in writing, and telling those apart is what lets the desk
+  // answer today instead of going quiet until every box is filled.
+  const missingToIndicate = FIELDS
+    .filter(f => f.needed === 'indicate' && isBlank(record[f.key])).map(f => f.key);
+  const missingToQuote = FIELDS
+    .filter(f => f.needed === 'quote' && isBlank(record[f.key])).map(f => f.key);
+
   const conflicts = [];
   const appetite = [];
-  const notes = [];
+  const quoteNotes = [];
 
   const cls = record.governing_class ? String(record.governing_class).trim() : null;
   if (cls && PROHIBITED_CLASSES[cls]) {
@@ -679,7 +708,6 @@ function evaluate(record = state.record) {
       fields: ['experience_mod'],
     });
   }
-
   if (incurred !== null && incurred > MAX_INCURRED) {
     appetite.push({
       code: 'LOSS_SEVERITY',
@@ -712,36 +740,47 @@ function evaluate(record = state.record) {
 
   const yearsProvided = num(record.loss_run_years);
   if (yearsProvided !== null && yearsProvided < MIN_LOSS_RUN_YEARS) {
-    notes.push({
+    quoteNotes.push({
       code: 'SHORT_LOSS_HISTORY',
-      message: `Only ${yearsProvided} year${yearsProvided === 1 ? '' : 's'} of loss runs provided. ${MIN_LOSS_RUN_YEARS} are needed to firm up a quote.`,
+      message: `Only ${yearsProvided} year${yearsProvided === 1 ? '' : 's'} of loss runs. ${MIN_LOSS_RUN_YEARS} are needed for a firm quote.`,
       fields: ['loss_run_years'],
     });
   }
 
-  // Order matters: get out of the way of risks you will never write.
+  // Order matters: get out of the way of risks you will never write, then stop
+  // on anything a person has to settle, then decide how firm an answer we owe.
   let lane;
   if (appetite.length) lane = 'likely_decline';
   else if (conflicts.length) lane = 'send_for_info';
-  else if (missing.length) lane = 'send_for_info';
-  else if (notes.length) lane = 'indication';
+  else if (missingToIndicate.length) lane = 'send_for_info';
+  else if (missingToQuote.length || quoteNotes.length) lane = 'indication';
   else lane = 'quote_now';
 
   const filled = FIELD_KEYS.filter(k => !isBlank(record[k])).length;
+  // Everything standing between here and a firm quote, in one list the reply
+  // can be written from.
+  const neededToQuote = [
+    ...missingToIndicate.map(k => ({ code: 'MISSING', field: k, message: fieldLabel(k) })),
+    ...missingToQuote.map(k => ({ code: 'MISSING', field: k, message: fieldLabel(k) })),
+    ...quoteNotes,
+  ];
+
   return {
     lane,
     laneLabel: LANES[lane].label,
-    missing,
+    missingToIndicate,
+    missingToQuote,
+    quoteNotes,
+    neededToQuote,
     conflicts,
     appetite,
-    notes,
     completeness: Math.round((filled / FIELD_KEYS.length) * 100),
-    requiredRemaining: missing.length,
+    requiredRemaining: missingToIndicate.length + missingToQuote.length,
   };
 }
 
 // Finds the line in each document that speaks to the loss question, so the
-// underwriter can check the wording rather than take our word for it.
+// underwriter is deciding against the source text and not a summary of it.
 function evidenceForLossMismatch() {
   const out = [];
   // Up to two matching lines, so a bare column of figures arrives with the
@@ -972,7 +1011,13 @@ function renderEmail() {
   const sub = openSubmission();
   pane.innerHTML = '';
   if (!sub) {
-    pane.append(el('p', 'muted', 'Nothing open. Pick a submission from the queue, or ask your agent to.'));
+    const empty = el('div', 'empty');
+    empty.append(el('div', 'empty__h', 'Pick one of the three above to begin'));
+    empty.append(el('p', 'empty__p',
+      'Each one is a real submission that lands in a different place. Watch the agent read the '
+      + 'email and the attached PDFs, fill this record, and stop when it needs you. '
+      + 'You can also click a submission in the queue and work it yourself.'));
+    pane.append(empty);
     return;
   }
   const head = el('div', 'email__head');
@@ -1183,11 +1228,13 @@ function renderRecord() {
       const wrap = el('div', 'field');
       wrap.dataset.field = f.key;
       if (pending && pending.field === f.key) wrap.classList.add('field--asked');
-      if (f.required && isBlank(state.record[f.key])) wrap.classList.add('field--missing');
+      if (f.needed === 'indicate' && isBlank(state.record[f.key])) wrap.classList.add('field--missing');
+      if (f.needed === 'quote' && isBlank(state.record[f.key])) wrap.classList.add('field--toquote');
 
       const lab = el('label', 'field__label', f.label);
       lab.htmlFor = `f-${f.key}`;
-      if (f.required) lab.append(el('span', 'req', '*'));
+      if (f.needed === 'indicate') lab.append(el('span', 'req', '*'));
+      if (f.needed === 'quote') lab.append(el('span', 'req req--quote', '†'));
       wrap.append(lab);
 
       const asked = pending && pending.field === f.key;
@@ -1204,7 +1251,9 @@ function renderRecord() {
         const raw = state.record[f.key];
         input.value = isBlank(raw) ? '' : (f.type === 'money' ? asMoney(raw) : raw);
         input.placeholder = asked ? `Type the ${f.label} here`
-                                  : (f.required ? 'required' : 'optional');
+          : f.needed === 'indicate' ? 'needed to indicate'
+          : f.needed === 'quote' ? 'needed to quote'
+          : 'optional';
       }
       input.id = `f-${f.key}`;
       input.addEventListener('change', () => {
@@ -1226,7 +1275,10 @@ function renderRecord() {
       // panel somewhere else on the page.
       if (asked) {
         const note = el('div', 'fieldnote');
-        note.append(el('div', 'fieldnote__head', 'Your agent needs this. Type it in the box above.'));
+        const decision = evaluate().conflicts.some(c => c.fields.includes(f.key));
+        note.append(el('div', 'fieldnote__head', decision
+          ? 'Your agent needs you to decide this. The two documents are on the right.'
+          : 'Your agent needs this. Type it in the box above.'));
         note.append(el('p', 'fieldnote__ask', pending.question));
         if (pending.why) note.append(el('p', 'fieldnote__why', pending.why));
         box.append(note);
@@ -1240,7 +1292,9 @@ function renderRecord() {
 function renderRules() {
   const r = evaluate();
   $('#meter-fill').style.width = `${r.completeness}%`;
-  $('#meter-label').textContent = `${r.completeness}% captured · ${r.requiredRemaining} required field${r.requiredRemaining === 1 ? '' : 's'} still open`;
+  $('#meter-label').textContent = r.requiredRemaining === 0
+    ? `${r.completeness}% captured · nothing outstanding`
+    : `${r.completeness}% captured · ${r.requiredRemaining} field${r.requiredRemaining === 1 ? '' : 's'} still to come from the producer`;
 
   for (const key of Object.keys(LANES)) {
     const chip = document.querySelector(`[data-lane="${key}"]`);
@@ -1311,8 +1365,12 @@ function renderRules() {
     findings.append(settled);
   }
 
-  add('missing', 'Missing to quote', r.missing.map(k => fieldLabel(k)));
-  add('note', 'Limits what we can offer', r.notes);
+  add('missing', 'Missing before we can even indicate', r.missingToIndicate.map(k => fieldLabel(k)));
+  const toQuote = [
+    ...r.missingToQuote.map(k => `${fieldLabel(k)} — ask the producer`),
+    ...r.quoteNotes.map(n => n.message),
+  ];
+  add('note', 'Needed to turn the indication into a quote', toQuote);
   if (!findings.children.length && state.openSubmissionId) {
     findings.append(el('p', 'muted', 'No open items. Everything needed to quote is on the record.'));
   }
@@ -1323,8 +1381,10 @@ function renderRules() {
   if (state.pendingQuestion) {
     const q = state.pendingQuestion;
     qbox.hidden = false;
+    const isDecision = evaluate().conflicts.some(c => c.fields.includes(q.field));
     qbox.append(el('div', 'question__label', 'Your turn'));
-    qbox.append(el('div', 'question__do', `Enter the ${fieldLabel(q.field)}`));
+    qbox.append(el('div', 'question__do',
+      isDecision ? 'Pick which document to go with' : `Enter the ${fieldLabel(q.field)}`));
     qbox.append(el('p', 'question__text', q.question));
     if (q.why) {
       const why = el('div', 'question__why');
@@ -1333,9 +1393,13 @@ function renderRules() {
       qbox.append(why);
     }
     const actions = el('div', 'question__actions');
-    const go = el('button', 'btn btn--primary', `Go to ${fieldLabel(q.field)}`);
+    const go = el('button', 'btn btn--primary',
+      isDecision ? 'Show me the two documents' : `Go to ${fieldLabel(q.field)}`);
     go.type = 'button';
-    go.addEventListener('click', () => focusField(q.field));
+    go.addEventListener('click', () => {
+      if (isDecision) $('#findings').scrollIntoView({ block: 'center', behavior: 'smooth' });
+      else focusField(q.field);
+    });
     const dismiss = el('button', 'btn btn--ghost', 'Dismiss');
     dismiss.type = 'button';
     dismiss.addEventListener('click', clearQuestion);
@@ -1393,16 +1457,18 @@ function renderActionBar() {
       go: () => $('#findings').scrollIntoView({ block: 'center', behavior: 'smooth' }),
     });
   }
-  if (state.pendingQuestion) {
+  // If a conflict already claimed this field, its chip says it better.
+  const claimed = r.conflicts.some(c => c.fields.includes(
+    state.pendingQuestion ? state.pendingQuestion.field : null));
+  if (state.pendingQuestion && !claimed) {
     jobs.push({
       text: `Enter the ${fieldLabel(state.pendingQuestion.field)}`,
       go: () => focusField(state.pendingQuestion.field),
     });
   }
-  for (const key of r.missing) {
-    if (state.pendingQuestion && state.pendingQuestion.field === key) continue;
-    jobs.push({ text: `Enter the ${fieldLabel(key).toLowerCase()}`, go: () => focusField(key) });
-  }
+  // Missing fields are deliberately NOT listed here. If a value is absent from
+  // every document, the underwriter cannot supply it either - it goes on the
+  // list the agent sends back to the producer.
   if (r.appetite.length) {
     jobs.push({
       text: 'Decline it, or override the appetite rule',
@@ -1413,6 +1479,12 @@ function renderActionBar() {
     jobs.push({
       text: 'Approve or reject the routing',
       go: () => $('#routing').scrollIntoView({ block: 'center', behavior: 'smooth' }),
+    });
+  }
+  if (!jobs.length && state.reply && !state.replySent) {
+    jobs.push({
+      text: 'Read and send the reply',
+      go: () => $('#reply').scrollIntoView({ block: 'center', behavior: 'smooth' }),
     });
   }
 
@@ -1646,12 +1718,16 @@ const TOOLS = [
       for (const res of Object.values(state.resolutions)) {
         out.push(`THE UNDERWRITER DECIDED: ${res.settled}.`);
       }
-      if (r.missing.length) out.push('MISSING TO QUOTE: ' + r.missing.map(fieldLabel).join(', ') + '.');
-      if (r.notes.length) out.push('LIMITS THE OFFER: ' + r.notes.map(n => n.message).join(' '));
-      if (!r.appetite.length && !r.conflicts.length && !r.missing.length && !r.notes.length) {
-        out.push('Nothing open. This one is ready to rate.');
+      if (r.missingToIndicate.length) {
+        out.push('CANNOT EVEN INDICATE WITHOUT: ' + r.missingToIndicate.map(fieldLabel).join(', ') + '.');
       }
-      out.push('Use ask_underwriter for anything a person has to settle, then propose_routing.');
+      if (r.missingToQuote.length || r.quoteNotes.length) {
+        const items = [...r.missingToQuote.map(fieldLabel), ...r.quoteNotes.map(n => n.message)];
+        out.push('NEEDED TO TURN THE INDICATION INTO A QUOTE: ' + items.join('; ') + '.');
+        out.push('None of that is on this page. It has to come from the producer — put it in draft_reply, do not ask the underwriter for it.');
+      }
+      if (r.lane === 'quote_now') out.push('Nothing open. This one is ready to rate.');
+      out.push('ask_underwriter is only for a judgment call the underwriter has to make. Then propose_routing, then draft_reply.');
       logToolCall('check_submission', `${r.laneLabel} · ${r.requiredRemaining} required open`);
       return out.join('\n');
     },
@@ -1662,11 +1738,11 @@ const TOOLS = [
     name: 'ask_underwriter',
     title: 'Ask the underwriter for help',
     description:
-      'Raises one field to the human underwriter: highlights it, explains why it matters, and puts a question to them. Use when a value is missing from every document, is unreadable, or when documents disagree. Returns the words to say to the user. Changes no data. The page supplies the standard reason a field is needed, so you only pass why if you know something more specific.',
+      'Raises a judgment call to the human underwriter: highlights the field, explains why it matters, and puts a question to them. Use ONLY for something a person has to decide, such as two documents disagreeing. Do NOT use it for a value that is simply missing from the paperwork — the underwriter does not have that either, so it belongs in draft_reply to the producer. Returns the words to say. Changes no data.',
     inputSchema: {
       type: 'object',
       properties: {
-        field: { type: 'string', enum: FIELD_KEYS, description: 'Which field on the record the underwriter needs to settle.' },
+        field: { type: 'string', enum: FIELD_KEYS, description: 'Which field on the record the underwriter has to make a call on.' },
         question: { type: 'string', description: 'The question in plain language, saying what you found and what you need from them.' },
         why: { type: 'string', description: 'Optional. Why this value matters here, if you know something the page does not.' },
       },
@@ -1681,6 +1757,13 @@ const TOOLS = [
       }
       const q = String(question || '').trim();
       if (!q) return 'Pass a question. The underwriter needs to know what you are asking for and why.';
+      // Guardrail: a blank field that no document carries is a request to the
+      // producer, not a question for the person sitting at this desk.
+      const r = evaluate();
+      const isJudgementCall = r.conflicts.some(c => c.fields.includes(key));
+      if (!isJudgementCall && isBlank(state.record[key])) {
+        return `"${fieldLabel(key)}" is blank in every document you have read, so the underwriter cannot supply it either. Ask the producer for it instead — put it in draft_reply. Use ask_underwriter only for a call a person has to make, like two documents disagreeing.`;
+      }
       const reason = (why && String(why).trim()) || fieldWhy(key);
       askUnderwriter(key, q, reason);
       logToolCall('ask_underwriter', `Asked for ${fieldLabel(key)}`, 'ask');
@@ -1848,7 +1931,7 @@ function resetAll() {
   state.log = [];
   resetRecord();
   render();
-  say('you', 'Ready when you are. Pick one above.');
+  say('you', 'Ready when you are. Pick one of the three above.');
   setBusy(false, null);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1962,31 +2045,31 @@ async function playProblem() {
   await wait(1300);
 
   await run('ask_underwriter', {
-    field: 'fein',
-    question: 'The application left the FEIN blank and the loss run does not carry it either — can you pull it from the prior policy?',
+    field: 'losses_on_app',
+    question: 'Which document should I go with on the losses — the application, or the loss run from Midwest Indemnity?',
   });
-  say('agent', 'Two things need you: enter the FEIN, and say which document to go with on the losses. Both are listed in the bar at the top.');
+  say('agent', 'The FEIN is a different kind of problem. It is blank in both documents, so you cannot supply it either — I will ask Priya for it in the reply. This one is yours: pick which document to go with.');
 
   await waitFor(
-    () => !isBlank(state.record.fein) && evaluate().conflicts.length === 0,
-    'Still waiting on you. The FEIN box is highlighted, and the two buttons are on the Contradiction card.',
+    () => evaluate().conflicts.length === 0,
+    'Still waiting on you. Read the two quotes on the Contradiction card and press either Use the loss run or Use the application.',
   );
 
   const settled = Object.values(state.resolutions)[0];
-  say('you', 'Done — FEIN is in' + (settled ? `, and I went with the ${settled.trusted === 'loss_run' ? 'loss run' : 'application'}.` : '.'));
+  say('you', settled ? `I went with the ${settled.trusted === 'loss_run' ? 'loss run' : 'application'}.` : 'Settled.');
   await wait(700);
 
   t = say('agent', 'Thanks. Re-running the rules…', true);
   await run('check_submission');
   await wait(800); t.remove();
-  say('agent', 'That settles it, and both answers stay on the file so it is clear what each document said. What is left is that the loss runs only cover two years, and you need three to firm up a quote. So this is an indication.');
-  await wait(1400);
+  say('agent', 'That settles it, and both answers stay on the file so it is clear what each document said. Two things are still missing and neither is on this page — the FEIN, and the third year of loss runs. So we can indicate, not quote.');
+  await wait(1600);
 
   await run('propose_routing', {
     lane: 'indication',
-    rationale: 'In appetite: class 2802, mod 1.18, $92,400 incurred — all inside the guidelines. The loss run only covers two policy years, so we can price a ballpark but cannot firm it up until the missing year comes in.',
+    rationale: 'In appetite: class 2802, mod 1.18, $92,400 incurred — all inside the guidelines. Missing the FEIN and the third year of loss runs, both of which have to come from the producer, so we can price a ballpark but not firm it up yet.',
   });
-  say('agent', 'Indication is on screen with my reasoning. Approve it and I will write to Priya.');
+  say('agent', 'Indication is on screen with my reasoning. Approve it and I will write to Priya for the two things we need.');
   await waitFor(approved, 'Still waiting on you. Approve and route is on the Routing decision card.');
   await wait(600);
 
@@ -2000,20 +2083,20 @@ Thanks for sending Cascade Millwork over. We can put an indication together now,
 WHAT WE CAN DO NOW
 Indication only, based on class 2802, $2,692,000 payroll, mod 1.18 and the loss experience shown below.
 
-WHAT WE NEED TO QUOTE
-1. The third year of loss runs — 10/01/2023 to 10/01/2024 — valued within the last 90 days. Midwest Indemnity should be able to pull it. This is the only thing standing between an indication and a firm quote.
+WHAT WE NEED FROM YOU TO QUOTE
+1. The FEIN. The application left it blank and it is not on the loss run. We cannot rate or file without it, and we do not want to guess and issue against the wrong entity.
+
+2. The third year of loss runs — 10/01/2023 to 10/01/2024 — valued within the last 90 days. Midwest Indemnity should be able to pull it.
 
 WORTH FLAGGING TO THE INSURED
-2. The application answers "no losses in the past 3 years." The attached Midwest Indemnity loss run shows 4 claims and $92,400 incurred for 10/01/2024 to 07/15/2026, including a lost-time amputation. We are going with the loss run. Worth correcting on their end so the next application is right.
+3. The application answers "no losses in the past 3 years." The attached Midwest Indemnity loss run shows 4 claims and $92,400 incurred for 10/01/2024 to 07/15/2026, including a lost-time amputation. We are going with the loss run. Worth correcting on their end so the next application is right.
 
-3. We had to source the FEIN separately — the application left it blank.
-
-Send the missing year and we will turn this around quickly.
+Send those two over and we will turn this around quickly.
 
 Justin`,
   });
   await wait(650); t.remove();
-  say('agent', 'Draft is below — the indication and the list of what is needed to quote. Read it, change anything, and send it. I cannot send it myself.');
+  say('agent', 'Draft is below — the indication, and the two things I need from Priya to make it a quote. Read it, change anything, and send it. I cannot send it myself.');
 }
 
 // ---------------------------------------------------------------------------
@@ -2096,6 +2179,6 @@ for (const btn of playButtons) {
   btn.addEventListener('click', () => play(btn.dataset.play));
 }
 resetBtn.addEventListener('click', resetAll);
-say('you', 'Ready when you are. Pick one above.');
+say('you', 'Ready when you are. Pick one of the three above.');
 
 </script>

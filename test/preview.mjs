@@ -30,6 +30,10 @@ for (const scheme of ['light', 'dark']) {
   check(tag('page renders the queue'), (await page.locator('.mail').count()) === 3);
   check(tag('8 tools registered'), (await page.textContent('#tool-status')).includes('8 site tools'));
   check(tag('three replays are offered'), (await page.locator('[data-play]').count()) === 3);
+  check(tag('the visitor is told to pick one'), (await page.textContent('.playerbar__label')).includes('Pick one'));
+  check(tag('the empty workspace says what to do'), (await page.textContent('#email')).includes('Pick one of the three above'));
+  check(tag('no replay is preselected'), (await page.locator('[data-play][aria-pressed="true"]').count()) === 0);
+  check(tag('each replay says what it shows'), (await page.textContent('[data-play="decline"]')).includes('twenty seconds'));
   check(tag('the trust model is on the page'), (await page.textContent('#limits')).includes('no password and no login'));
   check(tag('the page says why the job is hard'), (await page.textContent('.playerbar')).includes('retype fifteen numbers'));
 
@@ -37,6 +41,7 @@ for (const scheme of ['light', 'dark']) {
   await page.click('[data-play="clean"]');
   await page.waitForSelector('#routing .btn--primary', { timeout: 30000 });
   check(tag('clean submission reaches Quote Now'), (await page.textContent('#routing')).includes('Quote Now'));
+  check(tag('clean one has nothing outstanding'), (await page.textContent('#meter-label')).includes('nothing outstanding'));
   check(tag('clean one still waits for approval'), !(await page.textContent('#routing')).includes('Routed by the underwriter'));
   check(tag('clean one lit the Quote Now lane'), (await page.locator('[data-lane="quote_now"].lane--active').count()) === 1);
   await page.click('#routing .btn--primary');
@@ -60,22 +65,26 @@ for (const scheme of ['light', 'dark']) {
 
   // ---- 3. the one with a problem -> Send for Info -> Indication ----------
   await page.click('[data-play="problem"]');
-  await page.waitForSelector('.field--asked[data-field="fein"]', { timeout: 30000 });
-  check(tag('agent stops and highlights the FEIN'), true);
+  await page.waitForSelector('.field--asked[data-field="losses_on_app"]', { timeout: 30000 });
+  check(tag('agent stops on the judgment call, not the blank field'), true);
+  check(tag('it says why the FEIN is not the desk\'s problem'),
+    (await page.textContent('#transcript')).includes('you cannot supply it either'));
+  check(tag('the FEIN is left blank, as it should be'), (await page.inputValue('#f-fein')) === '');
   check(tag('record filled from the documents'), (await page.inputValue('#f-named_insured')) === 'Cascade Millwork Inc.');
   check(tag('payroll shown with separators'), (await page.inputValue('#f-annual_payroll')) === '$2,692,000');
   check(tag('facts credited to each document'),
     (await page.textContent('#record')).includes('from cascade-application.pdf')
     && (await page.textContent('#record')).includes('from cascade-loss-run.pdf'));
   check(tag('contradiction shows the receipts'), (await page.textContent('.conflict')).includes('cascade-loss-run.pdf'));
-  check(tag('both readings are offered as buttons'), (await page.locator('.btn--choice').count()) === 2);
+  check(tag('both readings are offered as buttons'), (await page.locator('.conflict .btn--choice').count()) === 2);
   check(tag('the loss run quote is legible'), /total incurred/i.test(await page.textContent('.evidence__item--loss_run')));
   check(tag('lane is Send for Info'), (await page.locator('[data-lane="send_for_info"].lane--active').count()) === 1);
-  check(tag('the FEIN field itself carries the ask'), (await page.textContent('#record')).includes('Type it in the box above'));
-  check(tag('question panel explains why the FEIN matters'), (await page.textContent('#question')).includes('rating bureau'));
-  check(tag('action bar names both jobs'),
-    (await page.textContent('#actionbar')).includes('Enter the FEIN')
-    && (await page.textContent('#actionbar')).includes('Decide which document is right'));
+  check(tag('the asked field frames it as a decision'), (await page.textContent('#record')).includes('needs you to decide this'));
+  check(tag('the action bar asks only for the decision'),
+    (await page.textContent('#actionbar')).includes('Decide which document is right')
+    && !(await page.textContent('#actionbar')).includes('Enter the FEIN'));
+  check(tag('the FEIN is listed as needed to quote, not as a desk task'),
+    (await page.textContent('#findings')).includes('ask the producer'));
   check(tag('no document "governs" phrasing'),
     !/(document|loss run|application)s?\s+governs?/i.test(await page.textContent('body')));
 
@@ -100,12 +109,7 @@ for (const scheme of ['light', 'dark']) {
   // it should still be waiting, because we have not answered
   check(tag('it is still waiting before we answer'), !(await page.textContent('#routing')).includes('Indication'));
 
-  await page.fill('#f-fein', '38-2841190');
-  await page.dispatchEvent('#f-fein', 'change');
-  await page.waitForTimeout(500);
-  check(tag('half an answer is not enough'), !(await page.textContent('#routing')).includes('Indication'));
-
-  await page.click('.btn--choice');
+  await page.click('.conflict .btn--choice');
   check(tag('settling it leaves a trail'), (await page.textContent('#findings')).includes('You settled this'));
 
   // answering is what advances it — no Continue button
@@ -118,9 +122,11 @@ for (const scheme of ['light', 'dark']) {
   await page.waitForSelector('#reply .btn--primary', { timeout: 30000 });
   const reply = await page.textContent('#reply');
   check(tag('reply separates what we can do now'), /WHAT WE CAN DO NOW/.test(reply));
-  check(tag('reply lists what is needed to quote'), /WHAT WE NEED TO QUOTE/.test(reply));
+  check(tag('reply lists what is needed to quote'), /WHAT WE NEED FROM YOU TO QUOTE/.test(reply));
   check(tag('reply names the missing loss run year'), reply.includes('10/01/2023'));
+  check(tag('reply asks the producer for the FEIN'), /The FEIN\. The application left it blank/.test(reply));
   check(tag('reply flags the contradiction to the producer'), /no losses in the past 3 years/i.test(reply));
+  check(tag('the FEIN was never typed by the desk'), (await page.inputValue('#f-fein')) === '');
   check(tag('the page says the agent cannot send it'), reply.includes('cannot send it'));
   await page.click('#reply .btn--primary');
   await page.waitForTimeout(200);

@@ -12,7 +12,7 @@
 //   * the UI updates before a tool returns
 //   * nothing consequential runs without a human clicking
 // ---------------------------------------------------------------------------
-import { INBOX, LANES, state, evaluate, findSubmission, openSubmission, fieldLabel, fieldWhy, FIELD_KEYS } from './state.js';
+import { INBOX, LANES, state, evaluate, findSubmission, openSubmission, fieldLabel, fieldWhy, isBlank, FIELD_KEYS } from './state.js';
 import {
   openSubmissionById, extractAttachment, setFields, askUnderwriter,
   proposeRoute, draftReply, logToolCall, setToolStatus,
@@ -184,12 +184,16 @@ const TOOLS = [
       for (const res of Object.values(state.resolutions)) {
         out.push(`THE UNDERWRITER DECIDED: ${res.settled}.`);
       }
-      if (r.missing.length) out.push('MISSING TO QUOTE: ' + r.missing.map(fieldLabel).join(', ') + '.');
-      if (r.notes.length) out.push('LIMITS THE OFFER: ' + r.notes.map(n => n.message).join(' '));
-      if (!r.appetite.length && !r.conflicts.length && !r.missing.length && !r.notes.length) {
-        out.push('Nothing open. This one is ready to rate.');
+      if (r.missingToIndicate.length) {
+        out.push('CANNOT EVEN INDICATE WITHOUT: ' + r.missingToIndicate.map(fieldLabel).join(', ') + '.');
       }
-      out.push('Use ask_underwriter for anything a person has to settle, then propose_routing.');
+      if (r.missingToQuote.length || r.quoteNotes.length) {
+        const items = [...r.missingToQuote.map(fieldLabel), ...r.quoteNotes.map(n => n.message)];
+        out.push('NEEDED TO TURN THE INDICATION INTO A QUOTE: ' + items.join('; ') + '.');
+        out.push('None of that is on this page. It has to come from the producer — put it in draft_reply, do not ask the underwriter for it.');
+      }
+      if (r.lane === 'quote_now') out.push('Nothing open. This one is ready to rate.');
+      out.push('ask_underwriter is only for a judgment call the underwriter has to make. Then propose_routing, then draft_reply.');
       logToolCall('check_submission', `${r.laneLabel} · ${r.requiredRemaining} required open`);
       return out.join('\n');
     },
@@ -200,11 +204,11 @@ const TOOLS = [
     name: 'ask_underwriter',
     title: 'Ask the underwriter for help',
     description:
-      'Raises one field to the human underwriter: highlights it, explains why it matters, and puts a question to them. Use when a value is missing from every document, is unreadable, or when documents disagree. Returns the words to say to the user. Changes no data. The page supplies the standard reason a field is needed, so you only pass why if you know something more specific.',
+      'Raises a judgment call to the human underwriter: highlights the field, explains why it matters, and puts a question to them. Use ONLY for something a person has to decide, such as two documents disagreeing. Do NOT use it for a value that is simply missing from the paperwork — the underwriter does not have that either, so it belongs in draft_reply to the producer. Returns the words to say. Changes no data.',
     inputSchema: {
       type: 'object',
       properties: {
-        field: { type: 'string', enum: FIELD_KEYS, description: 'Which field on the record the underwriter needs to settle.' },
+        field: { type: 'string', enum: FIELD_KEYS, description: 'Which field on the record the underwriter has to make a call on.' },
         question: { type: 'string', description: 'The question in plain language, saying what you found and what you need from them.' },
         why: { type: 'string', description: 'Optional. Why this value matters here, if you know something the page does not.' },
       },
@@ -219,6 +223,13 @@ const TOOLS = [
       }
       const q = String(question || '').trim();
       if (!q) return 'Pass a question. The underwriter needs to know what you are asking for and why.';
+      // Guardrail: a blank field that no document carries is a request to the
+      // producer, not a question for the person sitting at this desk.
+      const r = evaluate();
+      const isJudgementCall = r.conflicts.some(c => c.fields.includes(key));
+      if (!isJudgementCall && isBlank(state.record[key])) {
+        return `"${fieldLabel(key)}" is blank in every document you have read, so the underwriter cannot supply it either. Ask the producer for it instead — put it in draft_reply. Use ask_underwriter only for a call a person has to make, like two documents disagreeing.`;
+      }
       const reason = (why && String(why).trim()) || fieldWhy(key);
       askUnderwriter(key, q, reason);
       logToolCall('ask_underwriter', `Asked for ${fieldLabel(key)}`, 'ask');

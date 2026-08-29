@@ -6,7 +6,7 @@
 import {
   FIELDS, FIELD_KEYS, INBOX, LANES, state, evaluate, findSubmission,
   openSubmission, resetRecord, fieldLabel, fieldWhy, isBlank, resolveConflict,
-  DESK_USER, AGENT_LIMITS,
+  DESK_USER, AGENT_LIMITS, fieldNeeded,
 } from './state.js';
 
 // Money reads better with separators. State keeps whatever was written; only
@@ -126,7 +126,13 @@ function renderEmail() {
   const sub = openSubmission();
   pane.innerHTML = '';
   if (!sub) {
-    pane.append(el('p', 'muted', 'Nothing open. Pick a submission from the queue, or ask your agent to.'));
+    const empty = el('div', 'empty');
+    empty.append(el('div', 'empty__h', 'Pick one of the three above to begin'));
+    empty.append(el('p', 'empty__p',
+      'Each one is a real submission that lands in a different place. Watch the agent read the '
+      + 'email and the attached PDFs, fill this record, and stop when it needs you. '
+      + 'You can also click a submission in the queue and work it yourself.'));
+    pane.append(empty);
     return;
   }
   const head = el('div', 'email__head');
@@ -350,11 +356,13 @@ function renderRecord() {
       const wrap = el('div', 'field');
       wrap.dataset.field = f.key;
       if (pending && pending.field === f.key) wrap.classList.add('field--asked');
-      if (f.required && isBlank(state.record[f.key])) wrap.classList.add('field--missing');
+      if (f.needed === 'indicate' && isBlank(state.record[f.key])) wrap.classList.add('field--missing');
+      if (f.needed === 'quote' && isBlank(state.record[f.key])) wrap.classList.add('field--toquote');
 
       const lab = el('label', 'field__label', f.label);
       lab.htmlFor = `f-${f.key}`;
-      if (f.required) lab.append(el('span', 'req', '*'));
+      if (f.needed === 'indicate') lab.append(el('span', 'req', '*'));
+      if (f.needed === 'quote') lab.append(el('span', 'req req--quote', '†'));
       wrap.append(lab);
 
       const asked = pending && pending.field === f.key;
@@ -371,7 +379,9 @@ function renderRecord() {
         const raw = state.record[f.key];
         input.value = isBlank(raw) ? '' : (f.type === 'money' ? asMoney(raw) : raw);
         input.placeholder = asked ? `Type the ${f.label} here`
-                                  : (f.required ? 'required' : 'optional');
+          : f.needed === 'indicate' ? 'needed to indicate'
+          : f.needed === 'quote' ? 'needed to quote'
+          : 'optional';
       }
       input.id = `f-${f.key}`;
       input.addEventListener('change', () => {
@@ -393,7 +403,10 @@ function renderRecord() {
       // panel somewhere else on the page.
       if (asked) {
         const note = el('div', 'fieldnote');
-        note.append(el('div', 'fieldnote__head', 'Your agent needs this. Type it in the box above.'));
+        const decision = evaluate().conflicts.some(c => c.fields.includes(f.key));
+        note.append(el('div', 'fieldnote__head', decision
+          ? 'Your agent needs you to decide this. The two documents are on the right.'
+          : 'Your agent needs this. Type it in the box above.'));
         note.append(el('p', 'fieldnote__ask', pending.question));
         if (pending.why) note.append(el('p', 'fieldnote__why', pending.why));
         box.append(note);
@@ -407,7 +420,9 @@ function renderRecord() {
 function renderRules() {
   const r = evaluate();
   $('#meter-fill').style.width = `${r.completeness}%`;
-  $('#meter-label').textContent = `${r.completeness}% captured · ${r.requiredRemaining} required field${r.requiredRemaining === 1 ? '' : 's'} still open`;
+  $('#meter-label').textContent = r.requiredRemaining === 0
+    ? `${r.completeness}% captured · nothing outstanding`
+    : `${r.completeness}% captured · ${r.requiredRemaining} field${r.requiredRemaining === 1 ? '' : 's'} still to come from the producer`;
 
   for (const key of Object.keys(LANES)) {
     const chip = document.querySelector(`[data-lane="${key}"]`);
@@ -478,8 +493,12 @@ function renderRules() {
     findings.append(settled);
   }
 
-  add('missing', 'Missing to quote', r.missing.map(k => fieldLabel(k)));
-  add('note', 'Limits what we can offer', r.notes);
+  add('missing', 'Missing before we can even indicate', r.missingToIndicate.map(k => fieldLabel(k)));
+  const toQuote = [
+    ...r.missingToQuote.map(k => `${fieldLabel(k)} — ask the producer`),
+    ...r.quoteNotes.map(n => n.message),
+  ];
+  add('note', 'Needed to turn the indication into a quote', toQuote);
   if (!findings.children.length && state.openSubmissionId) {
     findings.append(el('p', 'muted', 'No open items. Everything needed to quote is on the record.'));
   }
@@ -490,8 +509,10 @@ function renderRules() {
   if (state.pendingQuestion) {
     const q = state.pendingQuestion;
     qbox.hidden = false;
+    const isDecision = evaluate().conflicts.some(c => c.fields.includes(q.field));
     qbox.append(el('div', 'question__label', 'Your turn'));
-    qbox.append(el('div', 'question__do', `Enter the ${fieldLabel(q.field)}`));
+    qbox.append(el('div', 'question__do',
+      isDecision ? 'Pick which document to go with' : `Enter the ${fieldLabel(q.field)}`));
     qbox.append(el('p', 'question__text', q.question));
     if (q.why) {
       const why = el('div', 'question__why');
@@ -500,9 +521,13 @@ function renderRules() {
       qbox.append(why);
     }
     const actions = el('div', 'question__actions');
-    const go = el('button', 'btn btn--primary', `Go to ${fieldLabel(q.field)}`);
+    const go = el('button', 'btn btn--primary',
+      isDecision ? 'Show me the two documents' : `Go to ${fieldLabel(q.field)}`);
     go.type = 'button';
-    go.addEventListener('click', () => focusField(q.field));
+    go.addEventListener('click', () => {
+      if (isDecision) $('#findings').scrollIntoView({ block: 'center', behavior: 'smooth' });
+      else focusField(q.field);
+    });
     const dismiss = el('button', 'btn btn--ghost', 'Dismiss');
     dismiss.type = 'button';
     dismiss.addEventListener('click', clearQuestion);
@@ -560,16 +585,18 @@ function renderActionBar() {
       go: () => $('#findings').scrollIntoView({ block: 'center', behavior: 'smooth' }),
     });
   }
-  if (state.pendingQuestion) {
+  // If a conflict already claimed this field, its chip says it better.
+  const claimed = r.conflicts.some(c => c.fields.includes(
+    state.pendingQuestion ? state.pendingQuestion.field : null));
+  if (state.pendingQuestion && !claimed) {
     jobs.push({
       text: `Enter the ${fieldLabel(state.pendingQuestion.field)}`,
       go: () => focusField(state.pendingQuestion.field),
     });
   }
-  for (const key of r.missing) {
-    if (state.pendingQuestion && state.pendingQuestion.field === key) continue;
-    jobs.push({ text: `Enter the ${fieldLabel(key).toLowerCase()}`, go: () => focusField(key) });
-  }
+  // Missing fields are deliberately NOT listed here. If a value is absent from
+  // every document, the underwriter cannot supply it either - it goes on the
+  // list the agent sends back to the producer.
   if (r.appetite.length) {
     jobs.push({
       text: 'Decline it, or override the appetite rule',
@@ -580,6 +607,12 @@ function renderActionBar() {
     jobs.push({
       text: 'Approve or reject the routing',
       go: () => $('#routing').scrollIntoView({ block: 'center', behavior: 'smooth' }),
+    });
+  }
+  if (!jobs.length && state.reply && !state.replySent) {
+    jobs.push({
+      text: 'Read and send the reply',
+      go: () => $('#reply').scrollIntoView({ block: 'center', behavior: 'smooth' }),
     });
   }
 

@@ -39,6 +39,34 @@ An agent can already read an email. It can't do the other four things this desk 
 
 Take the tools away and none of that works. That's the test we built against.
 
+## Two kinds of gap, and only one of them is yours
+
+The desk separates *a value nobody has* from *a call somebody has to make*, and it treats them
+completely differently. This turned out to be the most important distinction in the whole project.
+
+**Cascade Millwork's FEIN is blank on the application and absent from the loss run.** An earlier
+version of this demo highlighted the field and asked the underwriter to type it in. That is wrong,
+and any underwriter would spot it instantly: where would they get it? It is not in the paperwork. It
+lives with the insured. So a missing value goes onto the list the agent sends back to the producer —
+it never becomes a task at the desk.
+
+`ask_underwriter` enforces this. Call it on a field that is blank in every document read so far and
+it refuses:
+
+> "FEIN" is blank in every document you have read, so the underwriter cannot supply it either. Ask
+> the producer for it instead — put it in `draft_reply`. Use `ask_underwriter` only for a call a
+> person has to make, like two documents disagreeing.
+
+**What does belong at the desk is the contradiction.** Both documents exist, both are legible, and
+they disagree. No amount of asking the producer resolves that — someone with authority has to pick.
+That is the one thing the desk stops for.
+
+That split also gives the four lanes their teeth. There are two thresholds, not one: what you need
+to price a ballpark, and what you need to put a firm number in writing. Cascade has everything for
+an **Indication** and is missing two things needed for a **Quote** — the FEIN and the third year of
+loss runs — so the agent drafts a reply carrying the indication *and* a numbered list of what the
+producer has to send. That is what a real desk does instead of going quiet until every box is full.
+
 ## What people and agents can do together here that was hard before
 
 The interesting moment is the contradiction.

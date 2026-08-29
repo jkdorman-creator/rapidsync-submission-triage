@@ -119,31 +119,37 @@ check('unknown field reported back, not silently dropped', junk.includes('totall
 
 const c1 = await call('check_submission');
 check('rules catch the loss disclosure contradiction', c1.includes('CONTRADICTION'));
-check('rules list the missing FEIN', c1.includes('FEIN'));
+check('the FEIN is listed as a producer request, not a desk task', c1.includes('come from the producer'));
+check('the FEIN is named as needed to quote', c1.includes('FEIN'));
+check('the action bar does not ask the desk to type a missing value',
+  !(await page.textContent('#actionbar')).includes('Enter the FEIN'));
 check('lane is Send for Info', c1.includes('Send for Info'));
 check('Send for Info chip is lit', (await page.locator('[data-lane="send_for_info"].lane--active').count()) === 1);
 
-const ask = await call('ask_underwriter', { field: 'fein', question: 'The application left the FEIN blank and it is not on the loss run. What is it?' });
+// Asking the underwriter for a value that is blank in every document is the
+// wrong move: they do not have it either. The tool refuses and redirects.
+const wrongAsk = await call('ask_underwriter', { field: 'fein', question: 'What is the FEIN?' });
+check('asking the underwriter for a missing value is refused', wrongAsk.includes('blank in every document'));
+check('the refusal redirects to the producer', wrongAsk.includes('draft_reply'));
+check('no question panel was opened by the refused ask', await page.locator('#question').isHidden());
+
+// A genuine judgment call is what ask_underwriter is for.
+const ask = await call('ask_underwriter', { field: 'losses_on_app', question: 'Which document should I go with on the losses?' });
 check('ask_underwriter returns the words to say', ask.includes('Say this to the user'));
-check('ask_underwriter supplies the reason without being told', ask.includes('rating bureau'));
-check('question panel says what to do', (await page.textContent('#question')).includes('Enter the FEIN'));
-check('the field itself says what is wanted', (await page.textContent('[data-field="fein"], .group')).includes('Type it in the box above'));
-check('the field placeholder is an instruction', (await page.getAttribute('#f-fein', 'placeholder')) === 'Type the FEIN here');
+check('ask_underwriter supplies the reason without being told', ask.includes('stays on the file'));
+check('question panel frames a decision as a decision', (await page.textContent('#question')).includes('Pick which document to go with'));
 check('action bar names the jobs, not a count',
-  (await page.textContent('#actionbar')).includes('Enter the FEIN')
-  && (await page.textContent('#actionbar')).includes('Decide which document is right'));
-check('question panel explains why it matters', (await page.textContent('#question')).includes('cannot be rated'));
-check('question panel offers a jump to the field', (await page.textContent('#question')).includes('Go to FEIN'));
-check('asked field is highlighted on screen', (await page.locator('.field--asked[data-field="fein"]').count()) === 1);
+  (await page.textContent('#actionbar')).includes('Decide which document is right'));
+check('the action bar does not duplicate the same job twice',
+  !(await page.textContent('#actionbar')).includes('Enter the Losses'));
+check('question panel explains why it matters', (await page.textContent('#question')).includes('stays on the file'));
+check('question panel offers a jump to the evidence', (await page.textContent('#question')).includes('Show me the two documents'));
+check('asked field is highlighted on screen', (await page.locator('.field--asked[data-field="losses_on_app"]').count()) === 1);
 check('question panel is visible', !(await page.locator('#question').isHidden()));
 
 const badAsk = await call('ask_underwriter', { field: 'not_a_field', question: 'hi' });
 check('bad field name rejected with the valid list', badAsk.includes('not a field'));
 
-// the human answers, by hand, in the page
-await page.fill('#f-fein', '38-2841190');
-await page.dispatchEvent('#f-fein', 'change');
-check('answering clears the highlight', (await page.locator('.field--asked').count()) === 0);
 
 // the contradiction card shows the actual line from each document
 const conflictText = await page.textContent('.conflict');
@@ -163,7 +169,11 @@ check('contradiction clears once a person settles it', !c2.includes('CONTRADICTI
 check('agent is told what the person decided', c2.includes('THE UNDERWRITER DECIDED: You went with the loss run'));
 check('the application answer is left as written', (await page.inputValue('#f-losses_on_app')) === 'no');
 check('settled note stays on screen', (await page.textContent('#findings')).includes('You settled this'));
-check('short loss history now drives Indication', c2.includes('Indication') && c2.includes('LIMITS THE OFFER'));
+check('missing producer items drive Indication', c2.includes('Indication'));
+check('they are listed as needed to quote', c2.includes('NEEDED TO TURN THE INDICATION INTO A QUOTE'));
+check('the FEIN is one of them', c2.includes('FEIN'));
+check('the short loss history is the other', c2.includes('3 are needed for a firm quote'));
+check('the record still shows the FEIN blank', (await page.inputValue('#f-fein')) === '');
 
 const prop = await call('propose_routing', { lane: 'indication', rationale: 'Loss runs cover only two years, so we can indicate but not firm quote.' });
 check('propose_routing does not route on its own', prop.includes('Nothing has been routed'));
@@ -188,6 +198,7 @@ check('Likely Decline chip is lit', (await page.locator('[data-lane="likely_decl
 await call('open_submission', { submission_id: 'SUB-4471' });
 await call('update_submission', {
   named_insured: 'Harbor & Vine Restaurant Group LLC', fein: '84-3319072', state: 'MI',
+  entity_type: 'Limited Liability Company',
   effective_date: '11/01/2026', experience_mod: 0.92, governing_class: '9082',
   annual_payroll: 1845000, employee_count: 42,
   losses_on_app: 'yes', loss_run_years: 3, loss_run_claims: 2, loss_run_incurred: 8900,

@@ -5,37 +5,38 @@
 // ---------------------------------------------------------------------------
 
 export const FIELDS = [
-  { key: 'named_insured',      label: 'Named insured',        group: 'Applicant', required: true,  type: 'text',
+  { key: 'named_insured',      label: 'Named insured',        group: 'Applicant', needed: 'indicate', type: 'text',
     why: 'The policy is issued in this exact legal name. A quote in the wrong name has to be reissued.' },
-  { key: 'fein',               label: 'FEIN',                 group: 'Applicant', required: true,  type: 'text',
+  { key: 'fein',               label: 'FEIN',                 group: 'Applicant', needed: 'quote',    type: 'text',
     why: 'Carriers bind and file the policy on the FEIN, and it is how the experience mod is verified with the rating bureau. Without it this cannot be rated, and a quote issued against the wrong entity has to be pulled.' },
-  { key: 'entity_type',        label: 'Entity type',          group: 'Applicant', required: false, type: 'text' },
-  { key: 'state',              label: 'State(s) of operation',group: 'Applicant', required: true,  type: 'text',
+  { key: 'entity_type',        label: 'Entity type',          group: 'Applicant', needed: 'quote',    type: 'text',
+    why: 'Decides how owners and officers are included or excluded, which changes the payroll we rate on.' },
+  { key: 'state',              label: 'State(s) of operation',group: 'Applicant', needed: 'indicate', type: 'text',
     why: 'Rates, forms and the governing rating bureau all change by state.' },
-  { key: 'years_in_business',  label: 'Years in business',    group: 'Applicant', required: false, type: 'number' },
+  { key: 'years_in_business',  label: 'Years in business',    group: 'Applicant', needed: null,       type: 'number' },
 
-  { key: 'effective_date',     label: 'Effective date',       group: 'Coverage',  required: true,  type: 'text',
+  { key: 'effective_date',     label: 'Effective date',       group: 'Coverage',  needed: 'indicate', type: 'text',
     why: 'Sets which rate filing applies, and whether we can even meet the date.' },
-  { key: 'experience_mod',     label: 'Experience mod',       group: 'Coverage',  required: true,  type: 'number',
+  { key: 'experience_mod',     label: 'Experience mod',       group: 'Coverage',  needed: 'indicate', type: 'number',
     why: 'Multiplies the manual premium, and it is the first appetite test. Guessing at it produces a quote we cannot stand behind.' },
 
-  { key: 'governing_class',    label: 'Governing class code', group: 'Exposure',  required: true,  type: 'text',
+  { key: 'governing_class',    label: 'Governing class code', group: 'Exposure',  needed: 'indicate', type: 'text',
     why: 'The class carrying the most payroll decides the base rate and whether the risk is in appetite at all.' },
-  { key: 'class_description',  label: 'Class description',    group: 'Exposure',  required: false, type: 'text' },
-  { key: 'annual_payroll',     label: 'Total annual payroll', group: 'Exposure',  required: true,  type: 'money',
+  { key: 'class_description',  label: 'Class description',    group: 'Exposure',  needed: null,       type: 'text' },
+  { key: 'annual_payroll',     label: 'Total annual payroll', group: 'Exposure',  needed: 'indicate', type: 'money',
     why: 'Premium is rated per $100 of payroll. No payroll, no premium.' },
-  { key: 'employee_count',     label: 'Employee count',       group: 'Exposure',  required: true,  type: 'number',
+  { key: 'employee_count',     label: 'Employee count',       group: 'Exposure',  needed: 'indicate', type: 'number',
     why: 'Sanity-checks the payroll and drives which carriers will look at it.' },
 
-  { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', required: true, type: 'yesno',
+  { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', needed: 'indicate', type: 'yesno',
     why: 'What the application itself says about past losses. We leave it as written even when a loss run disagrees, so the disagreement stays on the file.' },
-  { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', required: true, type: 'number',
+  { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', needed: 'indicate', type: 'number',
     why: 'Three years is the minimum to firm up a quote. Fewer means an indication at best.' },
-  { key: 'loss_run_claims',    label: 'Claims shown on loss runs',       group: 'Loss history', required: false, type: 'number' },
-  { key: 'loss_run_incurred',  label: 'Total incurred on loss runs',     group: 'Loss history', required: false, type: 'money' },
+  { key: 'loss_run_claims',    label: 'Claims shown on loss runs',       group: 'Loss history', needed: null,       type: 'number' },
+  { key: 'loss_run_incurred',  label: 'Total incurred on loss runs',     group: 'Loss history', needed: null,       type: 'money' },
 
-  { key: 'agency_name',        label: 'Producing agency',     group: 'Producer',  required: false, type: 'text' },
-  { key: 'agent_email',        label: 'Producer email',       group: 'Producer',  required: false, type: 'text' },
+  { key: 'agency_name',        label: 'Producing agency',     group: 'Producer',  needed: null,       type: 'text' },
+  { key: 'agent_email',        label: 'Producer email',       group: 'Producer',  needed: null,       type: 'text' },
 ];
 
 export const FIELD_KEYS = FIELDS.map(f => f.key);
@@ -43,6 +44,7 @@ const byKey = Object.fromEntries(FIELDS.map(f => [f.key, f]));
 export const fieldLabel = k => (byKey[k] ? byKey[k].label : k);
 export const fieldType  = k => (byKey[k] ? byKey[k].type : 'text');
 export const fieldWhy   = k => (byKey[k] ? byKey[k].why : null);
+export const fieldNeeded = k => (byKey[k] ? byKey[k].needed : null);
 
 // --- RapidSync WC appetite. Deterministic, and visible to the underwriter. ---
 export const PROHIBITED_CLASSES = {
@@ -58,7 +60,7 @@ export const MIN_LOSS_RUN_YEARS = 3;
 
 export const LANES = {
   quote_now:     { label: 'Quote Now',     blurb: 'Everything checks out. Send it to rating.' },
-  indication:    { label: 'Indication',    blurb: 'Enough to price a ballpark, not enough to bind.' },
+  indication:    { label: 'Indication',    blurb: 'Enough to price a ballpark. Ask the producer for the rest.' },
   send_for_info: { label: 'Send for Info', blurb: 'Go back to the producer before anything else.' },
   likely_decline:{ label: 'Likely Decline',blurb: 'Outside appetite. Decline politely and fast.' },
 };
@@ -116,10 +118,17 @@ const num = v => {
 
 // --- The rules engine -------------------------------------------------------
 export function evaluate(record = state.record) {
-  const missing = FIELDS.filter(f => f.required && isBlank(record[f.key])).map(f => f.key);
+  // Two thresholds, not one. You can price a ballpark on less than you need to
+  // put a firm number in writing, and telling those apart is what lets the desk
+  // answer today instead of going quiet until every box is filled.
+  const missingToIndicate = FIELDS
+    .filter(f => f.needed === 'indicate' && isBlank(record[f.key])).map(f => f.key);
+  const missingToQuote = FIELDS
+    .filter(f => f.needed === 'quote' && isBlank(record[f.key])).map(f => f.key);
+
   const conflicts = [];
   const appetite = [];
-  const notes = [];
+  const quoteNotes = [];
 
   const cls = record.governing_class ? String(record.governing_class).trim() : null;
   if (cls && PROHIBITED_CLASSES[cls]) {
@@ -139,7 +148,6 @@ export function evaluate(record = state.record) {
       fields: ['experience_mod'],
     });
   }
-
   if (incurred !== null && incurred > MAX_INCURRED) {
     appetite.push({
       code: 'LOSS_SEVERITY',
@@ -172,36 +180,47 @@ export function evaluate(record = state.record) {
 
   const yearsProvided = num(record.loss_run_years);
   if (yearsProvided !== null && yearsProvided < MIN_LOSS_RUN_YEARS) {
-    notes.push({
+    quoteNotes.push({
       code: 'SHORT_LOSS_HISTORY',
-      message: `Only ${yearsProvided} year${yearsProvided === 1 ? '' : 's'} of loss runs provided. ${MIN_LOSS_RUN_YEARS} are needed to firm up a quote.`,
+      message: `Only ${yearsProvided} year${yearsProvided === 1 ? '' : 's'} of loss runs. ${MIN_LOSS_RUN_YEARS} are needed for a firm quote.`,
       fields: ['loss_run_years'],
     });
   }
 
-  // Order matters: get out of the way of risks you will never write.
+  // Order matters: get out of the way of risks you will never write, then stop
+  // on anything a person has to settle, then decide how firm an answer we owe.
   let lane;
   if (appetite.length) lane = 'likely_decline';
   else if (conflicts.length) lane = 'send_for_info';
-  else if (missing.length) lane = 'send_for_info';
-  else if (notes.length) lane = 'indication';
+  else if (missingToIndicate.length) lane = 'send_for_info';
+  else if (missingToQuote.length || quoteNotes.length) lane = 'indication';
   else lane = 'quote_now';
 
   const filled = FIELD_KEYS.filter(k => !isBlank(record[k])).length;
+  // Everything standing between here and a firm quote, in one list the reply
+  // can be written from.
+  const neededToQuote = [
+    ...missingToIndicate.map(k => ({ code: 'MISSING', field: k, message: fieldLabel(k) })),
+    ...missingToQuote.map(k => ({ code: 'MISSING', field: k, message: fieldLabel(k) })),
+    ...quoteNotes,
+  ];
+
   return {
     lane,
     laneLabel: LANES[lane].label,
-    missing,
+    missingToIndicate,
+    missingToQuote,
+    quoteNotes,
+    neededToQuote,
     conflicts,
     appetite,
-    notes,
     completeness: Math.round((filled / FIELD_KEYS.length) * 100),
-    requiredRemaining: missing.length,
+    requiredRemaining: missingToIndicate.length + missingToQuote.length,
   };
 }
 
 // Finds the line in each document that speaks to the loss question, so the
-// underwriter can check the wording rather than take our word for it.
+// underwriter is deciding against the source text and not a summary of it.
 function evidenceForLossMismatch() {
   const out = [];
   // Up to two matching lines, so a bare column of figures arrives with the

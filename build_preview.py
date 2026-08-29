@@ -80,10 +80,19 @@ ui_js = ui_js.replace(body.group(0), (
 body_html = re.search(r"<body>\n(.*?)\n<script type=\"module\">", index, re.S).group(1)
 PLAYER_BAR = """<div class="playerbar">
   <div class="playerbar__row">
-    <span class="playerbar__label">Watch the agent work</span>
-    <button type="button" class="btn btn--ghost" data-play="clean">A clean one</button>
-    <button type="button" class="btn btn--primary" data-play="problem">One with a problem</button>
-    <button type="button" class="btn btn--ghost" data-play="decline">One we cannot write</button>
+    <span class="playerbar__label">Pick one to watch</span>
+    <button type="button" class="btn btn--choice btn--play" data-play="clean">
+      <span class="btn__label">A clean one</span>
+      <span class="btn__detail">Everything is there. It still asks before it acts.</span>
+    </button>
+    <button type="button" class="btn btn--choice btn--play" data-play="problem">
+      <span class="btn__label">One with a problem</span>
+      <span class="btn__detail">Two documents disagree. Only you can settle it.</span>
+    </button>
+    <button type="button" class="btn btn--choice btn--play" data-play="decline">
+      <span class="btn__label">One we cannot write</span>
+      <span class="btn__detail">Out of appetite. Out in twenty seconds.</span>
+    </button>
     <button type="button" class="btn btn--ghost" id="reset">Reset</button>
   </div>
   <p class="playerbar__note">
@@ -110,7 +119,11 @@ extra_css = """
 .playerbar {
   padding: 11px 22px; background: var(--panel); border-bottom: 1px solid var(--line);
 }
-.playerbar__row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.playerbar__row { display: flex; align-items: stretch; gap: 9px; flex-wrap: wrap; }
+.btn--play { flex: 0 1 250px; }
+.btn--play:hover { border-color: var(--accent); }
+.btn--play[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.playerbar__label { align-self: center; }
 .playerbar__label {
   font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
   font-weight: 650; color: var(--muted); margin-right: 3px;
@@ -213,7 +226,7 @@ function resetAll() {
   state.log = [];
   resetRecord();
   render();
-  say('you', 'Ready when you are. Pick one above.');
+  say('you', 'Ready when you are. Pick one of the three above.');
   setBusy(false, null);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -327,31 +340,31 @@ async function playProblem() {
   await wait(1300);
 
   await run('ask_underwriter', {
-    field: 'fein',
-    question: 'The application left the FEIN blank and the loss run does not carry it either — can you pull it from the prior policy?',
+    field: 'losses_on_app',
+    question: 'Which document should I go with on the losses — the application, or the loss run from Midwest Indemnity?',
   });
-  say('agent', 'Two things need you: enter the FEIN, and say which document to go with on the losses. Both are listed in the bar at the top.');
+  say('agent', 'The FEIN is a different kind of problem. It is blank in both documents, so you cannot supply it either — I will ask Priya for it in the reply. This one is yours: pick which document to go with.');
 
   await waitFor(
-    () => !isBlank(state.record.fein) && evaluate().conflicts.length === 0,
-    'Still waiting on you. The FEIN box is highlighted, and the two buttons are on the Contradiction card.',
+    () => evaluate().conflicts.length === 0,
+    'Still waiting on you. Read the two quotes on the Contradiction card and press either Use the loss run or Use the application.',
   );
 
   const settled = Object.values(state.resolutions)[0];
-  say('you', 'Done — FEIN is in' + (settled ? `, and I went with the ${settled.trusted === 'loss_run' ? 'loss run' : 'application'}.` : '.'));
+  say('you', settled ? `I went with the ${settled.trusted === 'loss_run' ? 'loss run' : 'application'}.` : 'Settled.');
   await wait(700);
 
   t = say('agent', 'Thanks. Re-running the rules…', true);
   await run('check_submission');
   await wait(800); t.remove();
-  say('agent', 'That settles it, and both answers stay on the file so it is clear what each document said. What is left is that the loss runs only cover two years, and you need three to firm up a quote. So this is an indication.');
-  await wait(1400);
+  say('agent', 'That settles it, and both answers stay on the file so it is clear what each document said. Two things are still missing and neither is on this page — the FEIN, and the third year of loss runs. So we can indicate, not quote.');
+  await wait(1600);
 
   await run('propose_routing', {
     lane: 'indication',
-    rationale: 'In appetite: class 2802, mod 1.18, $92,400 incurred — all inside the guidelines. The loss run only covers two policy years, so we can price a ballpark but cannot firm it up until the missing year comes in.',
+    rationale: 'In appetite: class 2802, mod 1.18, $92,400 incurred — all inside the guidelines. Missing the FEIN and the third year of loss runs, both of which have to come from the producer, so we can price a ballpark but not firm it up yet.',
   });
-  say('agent', 'Indication is on screen with my reasoning. Approve it and I will write to Priya.');
+  say('agent', 'Indication is on screen with my reasoning. Approve it and I will write to Priya for the two things we need.');
   await waitFor(approved, 'Still waiting on you. Approve and route is on the Routing decision card.');
   await wait(600);
 
@@ -365,20 +378,20 @@ Thanks for sending Cascade Millwork over. We can put an indication together now,
 WHAT WE CAN DO NOW
 Indication only, based on class 2802, $2,692,000 payroll, mod 1.18 and the loss experience shown below.
 
-WHAT WE NEED TO QUOTE
-1. The third year of loss runs — 10/01/2023 to 10/01/2024 — valued within the last 90 days. Midwest Indemnity should be able to pull it. This is the only thing standing between an indication and a firm quote.
+WHAT WE NEED FROM YOU TO QUOTE
+1. The FEIN. The application left it blank and it is not on the loss run. We cannot rate or file without it, and we do not want to guess and issue against the wrong entity.
+
+2. The third year of loss runs — 10/01/2023 to 10/01/2024 — valued within the last 90 days. Midwest Indemnity should be able to pull it.
 
 WORTH FLAGGING TO THE INSURED
-2. The application answers "no losses in the past 3 years." The attached Midwest Indemnity loss run shows 4 claims and $92,400 incurred for 10/01/2024 to 07/15/2026, including a lost-time amputation. We are going with the loss run. Worth correcting on their end so the next application is right.
+3. The application answers "no losses in the past 3 years." The attached Midwest Indemnity loss run shows 4 claims and $92,400 incurred for 10/01/2024 to 07/15/2026, including a lost-time amputation. We are going with the loss run. Worth correcting on their end so the next application is right.
 
-3. We had to source the FEIN separately — the application left it blank.
-
-Send the missing year and we will turn this around quickly.
+Send those two over and we will turn this around quickly.
 
 Justin`,
   });
   await wait(650); t.remove();
-  say('agent', 'Draft is below — the indication and the list of what is needed to quote. Read it, change anything, and send it. I cannot send it myself.');
+  say('agent', 'Draft is below — the indication, and the two things I need from Priya to make it a quote. Read it, change anything, and send it. I cannot send it myself.');
 }
 
 // ---------------------------------------------------------------------------
@@ -461,7 +474,7 @@ for (const btn of playButtons) {
   btn.addEventListener('click', () => play(btn.dataset.play));
 }
 resetBtn.addEventListener('click', resetAll);
-say('you', 'Ready when you are. Pick one above.');
+say('you', 'Ready when you are. Pick one of the three above.');
 """
 
 # The preview needs executeTool even when no WebMCP browser is present.

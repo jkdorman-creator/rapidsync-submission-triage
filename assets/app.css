@@ -136,6 +136,8 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 .field__input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 .field__src { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .field--missing .field__input { border-color: color-mix(in srgb, var(--stop) 45%, var(--line)); }
+.field--toquote .field__input { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); border-style: dashed; }
+.req--quote { color: var(--warn); }
 .field--asked { background: color-mix(in srgb, var(--ask) 12%, transparent); }
 .field--asked .field__input { border-color: var(--ask); }
 @keyframes flashfill {
@@ -356,3 +358,8 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 .reply__actions { display: flex; gap: 8px; }
 .reply__note { margin: 11px 0 0; font-size: 11.5px; color: var(--muted); }
 .reply__sent { font-size: 12.5px; font-weight: 550; color: var(--ok); }
+
+/* ---- empty workspace: tell the visitor what to do ---------------------- */
+.empty { padding: 26px 4px; }
+.empty__h { font-size: 17px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 8px; }
+.empty__p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 62ch; }
