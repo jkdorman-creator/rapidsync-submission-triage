@@ -155,14 +155,14 @@ check('bad field name rejected with the valid list', badAsk.includes('not a fiel
 const conflictText = await page.textContent('.conflict');
 check('conflict card quotes the application', conflictText.includes('cascade-application.pdf'));
 check('conflict card quotes the loss run', conflictText.includes('cascade-loss-run.pdf'));
-check('conflict card offers both readings', (await page.locator('.btn--choice').count()) === 2);
+check('conflict card offers both readings', (await page.locator('.conflict .btn--choice').count()) === 2);
 check('conflict card offers a side-by-side check', conflictText.includes('side by side'));
 check('conflict wording is plain', conflictText.includes('Use the loss run') && !conflictText.includes('governs'));
 check('action bar is visible while something is open', !(await page.locator('#actionbar').isHidden()));
 check('header is sticky', (await page.evaluate(() => getComputedStyle(document.querySelector('.stickytop')).position)) === 'sticky');
 
 // the human settles it with one click, in favour of the loss run
-await page.click('.btn--choice');
+await page.click('.conflict .btn--choice');
 await page.waitForTimeout(200);
 const c2 = await call('check_submission');
 check('contradiction clears once a person settles it', !c2.includes('CONTRADICTION'));
@@ -224,7 +224,8 @@ check('an empty draft is refused', emptyDraft.includes('both a subject and a bod
 check('the signed-in person is named in the header', (await page.textContent('.who')).includes('J. Dorman'));
 check('the page says the agent has no login', (await page.textContent('#limits')).includes('no password and no login'));
 check('the page lists what the agent cannot do', (await page.textContent('#limits')).includes('Route a submission'));
-check('the page says why the job is hard', (await page.textContent('.demobar')).includes('retype'));
+check('the page says why the job is hard', (await page.textContent('.playerbar')).includes('retype'));
+check('the deployed page carries the replays too', (await page.locator('[data-play]').count()) === 3);
 
 // ---- output budgets -------------------------------------------------------
 const outputs = { list_inbox: inbox, open_submission: opened, check_submission: c4, propose_routing: prop, ask_underwriter: ask };

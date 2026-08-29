@@ -130,6 +130,18 @@ Appetite is checked first, on purpose. You don't spend an hour gathering data on
 
 ---
 
+## The live site works without a WebMCP browser
+
+`index.html` registers all eight tools on `document.modelContext` when a WebMCP browser is present,
+so a real agent can drive it. When one isn't, it registers the identical tool objects into a local
+map and says so in the header — *"No WebMCP in this browser — replays still work"*. It never claims
+support it doesn't have.
+
+Either way, three scripted replays ([`assets/demo.js`](assets/demo.js)) call those same eight tools
+in the same order through the same entry point, so anyone can watch the whole thing. They are a
+demo aid, not a second implementation — and each one stops and waits for a real person to make the
+call, exactly where the agent would.
+
 ## Running it
 
 Any static file server. Nothing to build, no backend, no keys.
@@ -155,7 +167,7 @@ npm test
 `test/shot.mjs` writes screenshots of the desk mid-scenario in both light and dark.
 
 `test/preview.mjs` drives the hosted preview end to end — presses play, checks the contradiction is
-shown with its receipts, settles it, and confirms it resumes to a routing proposal and a drafted reply. 54 checks.
+shown with its receipts, settles it, and confirms it resumes to a routing proposal and a drafted reply. 118 checks.
 
 ### The hosted preview
 
@@ -191,6 +203,7 @@ tells you what it is still waiting on.
 ```
 index.html            the desk
 assets/webmcp.js      every tool the agent can call — start here
+assets/demo.js        the three scripted replays, for watching without an agent
 assets/state.js       the record, the queue, and the underwriting rules
 assets/ui.js          rendering, and the functions both the buttons and the tools call
 assets/vendor/        PDF.js (Apache-2.0), vendored

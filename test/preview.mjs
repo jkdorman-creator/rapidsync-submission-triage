@@ -28,7 +28,11 @@ for (const scheme of ['light', 'dark']) {
   const tag = s => `[${scheme}] ${s}`;
 
   check(tag('page renders the queue'), (await page.locator('.mail').count()) === 3);
-  check(tag('8 tools registered'), (await page.textContent('#tool-status')).includes('8 site tools'));
+  const pill = await page.textContent('#tool-status');
+  check(tag('the page is honest about WebMCP not being present'), pill.includes('No WebMCP in this browser'));
+  check(tag('and says the replays still work'), pill.includes('replays still work'));
+  check(tag('all 8 tools are still callable'),
+    (await page.evaluate(() => document.modelContext.getTools().then(t => t.length))) === 8);
   check(tag('three replays are offered'), (await page.locator('[data-play]').count()) === 3);
   check(tag('the visitor is told to pick one'), (await page.textContent('.playerbar__label')).includes('Pick one'));
   check(tag('the empty workspace says what to do'), (await page.textContent('#email')).includes('Pick one of the three above'));

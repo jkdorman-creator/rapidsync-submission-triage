@@ -301,11 +301,30 @@ const TOOLS = [
 ];
 
 // --- Registration -----------------------------------------------------------
+// In a WebMCP browser the tools go to document.modelContext and a real agent can
+// call them. Anywhere else we register the identical tool objects into a local
+// map so the scripted replays still work — the page says plainly which of those
+// two it is, and never pretends to WebMCP support it does not have.
 export async function registerAll() {
   if (!('modelContext' in document)) {
-    setToolStatus('Site tools unavailable in this browser', false);
-    return { registered: 0, failed: [] };
+    const registry = new Map();
+    document.modelContext = {
+      async registerTool(tool) { registry.set(tool.name, tool); },
+      async getTools() { return [...registry.values()]; },
+      async executeTool(tool, input) {
+        const t = registry.get(typeof tool === 'string' ? tool : tool.name);
+        if (!t) throw new Error('no such tool');
+        const out = await t.execute(input || {}, { signal: new AbortController().signal });
+        return typeof out === 'string' ? out : JSON.stringify(out);
+      },
+      addEventListener() {}, removeEventListener() {},
+    };
+    document.documentElement.dataset.webmcp = 'absent';
+    for (const tool of TOOLS) await document.modelContext.registerTool(tool);
+    setToolStatus(`No WebMCP in this browser — replays still work`, false);
+    return { registered: 0, failed: [], native: false };
   }
+  document.documentElement.dataset.webmcp = 'native';
   const failed = [];
   let registered = 0;
   // One at a time, so a single rejection cannot silently skip the rest.
@@ -323,7 +342,7 @@ export async function registerAll() {
       : `${registered} of ${TOOLS.length} tools ready — ${failed.join(', ')}`,
     failed.length === 0
   );
-  return { registered, failed };
+  return { registered, failed, native: true };
 }
 
 export { TOOLS };

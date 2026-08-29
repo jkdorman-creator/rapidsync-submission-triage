@@ -423,27 +423,31 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 }
 .email__more:hover { text-decoration: underline; }
 
-
-/* ---- hosted preview only: the scripted agent -------------------------- */
+/* ---- the scripted replays --------------------------------------------- */
 .playerbar {
   padding: 11px 22px; background: var(--panel); border-bottom: 1px solid var(--line);
 }
 .playerbar__row { display: flex; align-items: stretch; gap: 9px; flex-wrap: wrap; }
-.btn--play { flex: 0 1 250px; }
-.btn--play:hover { border-color: var(--accent); }
-.btn--play[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
-.playerbar__label { align-self: center; }
 .playerbar__label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  align-self: center; font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
   font-weight: 650; color: var(--muted); margin-right: 3px;
 }
-.playerbar__note {
-  color: var(--muted); font-size: 12.5px; max-width: 96ch; margin: 8px 0 0;
-}
+.playerbar__note { color: var(--muted); font-size: 12.5px; max-width: 96ch; margin: 8px 0 0; }
 .playerbar__note strong { color: var(--ink); font-weight: 600; }
-.btn[data-play][aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn--play {
+  flex: 0 1 250px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  text-align: left; background: var(--panel); border-color: var(--line); color: inherit;
+  padding: 9px 12px;
+}
+.btn--play:hover { border-color: var(--accent); }
+.btn--play[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .btn[disabled] { opacity: .45; cursor: default; }
-.transcript { display: flex; flex-direction: column; gap: 9px; font-size: 13px; line-height: 1.55; max-height: 300px; overflow-y: auto; }
+
+.transcript {
+  display: flex; flex-direction: column; gap: 9px; font-size: 13px; line-height: 1.55;
+  max-height: 300px; overflow-y: auto;
+}
 .turn { display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: baseline; }
 .turn__who {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
@@ -463,6 +467,9 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
   .field--flash { animation: none; }
   .meter__fill { transition: none; }
 }
+
+
+/* ---- hosted preview only ---------------------------------------------- */
 .waiting { outline: 2px solid var(--ask); outline-offset: 3px; border-radius: 12px; }
 
 </style>
@@ -495,24 +502,26 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 <div class="playerbar">
   <div class="playerbar__row">
     <span class="playerbar__label">Pick one to watch</span>
-    <button type="button" class="btn btn--choice btn--play" data-play="clean">
+    <button type="button" class="btn btn--play" data-play="clean">
       <span class="btn__label">A clean one</span>
       <span class="btn__detail">Everything is there. It still asks before it acts.</span>
     </button>
-    <button type="button" class="btn btn--choice btn--play" data-play="problem">
+    <button type="button" class="btn btn--play" data-play="problem">
       <span class="btn__label">One with a problem</span>
       <span class="btn__detail">Two documents disagree. Only you can settle it.</span>
     </button>
-    <button type="button" class="btn btn--choice btn--play" data-play="decline">
+    <button type="button" class="btn btn--play" data-play="decline">
       <span class="btn__label">One we cannot write</span>
       <span class="btn__detail">Out of appetite. Out in twenty seconds.</span>
     </button>
     <button type="button" class="btn btn--ghost" id="reset">Reset</button>
   </div>
   <p class="playerbar__note">
-    <strong>The job:</strong> read the email, open the attachments, retype fifteen numbers, decide what
-    happens to it. Forty times a week. This hands the typing to an AI agent and keeps every decision.
+    <strong>The job:</strong> open the email, open the attachments, retype fifteen numbers, decide what
+    happens to it. Forty times a week. Re-keying into portals is the thing insurance agents name as the
+    worst part of their week. This hands the typing to an AI agent and keeps every decision.
     Each replay is real tool calls, and each one stops and waits for you to make the call.
+    <span class="demobar__fine">Demonstration only — every business, producer, document and claim below is invented.</span>
   </p>
 </div>
 
@@ -589,26 +598,6 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 
 
 <script type="module">
-
-// If no WebMCP browser is attached, stand up a local registry so the preview
-// still works. When one IS attached, the real document.modelContext wins and
-// the same tools are handed to it.
-if (!('modelContext' in document)) {
-  const registry = new Map();
-  document.modelContext = {
-    async registerTool(tool) { registry.set(tool.name, tool); },
-    async getTools() { return [...registry.values()]; },
-    async executeTool(tool, input) {
-      const t = registry.get(typeof tool === 'string' ? tool : tool.name);
-      if (!t) throw new Error('no such tool');
-      const out = await t.execute(input || {}, { signal: new AbortController().signal });
-      return typeof out === 'string' ? out : JSON.stringify(out);
-    },
-    addEventListener() {}, removeEventListener() {},
-  };
-  document.documentElement.dataset.previewShim = 'local';
-}
-
 // ---------------------------------------------------------------------------
 // state.js — the submission record, the seeded queue, and the underwriting
 // rules. Everything here is deterministic. No model judgment lives in this
@@ -1948,11 +1937,30 @@ const TOOLS = [
 ];
 
 // --- Registration -----------------------------------------------------------
+// In a WebMCP browser the tools go to document.modelContext and a real agent can
+// call them. Anywhere else we register the identical tool objects into a local
+// map so the scripted replays still work — the page says plainly which of those
+// two it is, and never pretends to WebMCP support it does not have.
 async function registerAll() {
   if (!('modelContext' in document)) {
-    setToolStatus('Site tools unavailable in this browser', false);
-    return { registered: 0, failed: [] };
+    const registry = new Map();
+    document.modelContext = {
+      async registerTool(tool) { registry.set(tool.name, tool); },
+      async getTools() { return [...registry.values()]; },
+      async executeTool(tool, input) {
+        const t = registry.get(typeof tool === 'string' ? tool : tool.name);
+        if (!t) throw new Error('no such tool');
+        const out = await t.execute(input || {}, { signal: new AbortController().signal });
+        return typeof out === 'string' ? out : JSON.stringify(out);
+      },
+      addEventListener() {}, removeEventListener() {},
+    };
+    document.documentElement.dataset.webmcp = 'absent';
+    for (const tool of TOOLS) await document.modelContext.registerTool(tool);
+    setToolStatus(`No WebMCP in this browser — replays still work`, false);
+    return { registered: 0, failed: [], native: false };
   }
+  document.documentElement.dataset.webmcp = 'native';
   const failed = [];
   let registered = 0;
   // One at a time, so a single rejection cannot silently skip the rest.
@@ -1970,11 +1978,23 @@ async function registerAll() {
       : `${registered} of ${TOOLS.length} tools ready — ${failed.join(', ')}`,
     failed.length === 0
   );
-  return { registered, failed };
+  return { registered, failed, native: true };
 }
 
 
-registerAll();
+await registerAll();
+// ---------------------------------------------------------------------------
+// demo.js — three scripted replays, so this page can be watched by anyone.
+//
+// These are a demo aid, not a second implementation. Each replay calls the same
+// eight tools registered in webmcp.js, in the same order, through the same
+// entry point an agent would use. In a WebMCP browser they go through
+// document.modelContext; anywhere else they fall back to the same tool objects
+// directly, so a judge without a WebMCP browser still sees exactly what the
+// agent does.
+// ---------------------------------------------------------------------------
+
+
 
 // ---------------------------------------------------------------------------
 // Scripted agent, hosted preview only. Three replays, one per lane. Each calls

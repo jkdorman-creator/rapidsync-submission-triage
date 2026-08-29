@@ -37,12 +37,31 @@
 <div id="actionbar" class="actionbar" hidden></div>
 </div>
 
-<p class="demobar">
-  <strong>The job:</strong> open the email, open the attachments, retype fifteen numbers, decide what
-  happens to it. Forty times a week. Re-keying into portals is the thing insurance agents name as the
-  worst part of their week. This page hands the typing to an AI agent and keeps every decision.
-  <span class="demobar__fine">Demonstration only — every business, producer, document and claim below is invented.</span>
-</p>
+<div class="playerbar">
+  <div class="playerbar__row">
+    <span class="playerbar__label">Pick one to watch</span>
+    <button type="button" class="btn btn--play" data-play="clean">
+      <span class="btn__label">A clean one</span>
+      <span class="btn__detail">Everything is there. It still asks before it acts.</span>
+    </button>
+    <button type="button" class="btn btn--play" data-play="problem">
+      <span class="btn__label">One with a problem</span>
+      <span class="btn__detail">Two documents disagree. Only you can settle it.</span>
+    </button>
+    <button type="button" class="btn btn--play" data-play="decline">
+      <span class="btn__label">One we cannot write</span>
+      <span class="btn__detail">Out of appetite. Out in twenty seconds.</span>
+    </button>
+    <button type="button" class="btn btn--ghost" id="reset">Reset</button>
+  </div>
+  <p class="playerbar__note">
+    <strong>The job:</strong> open the email, open the attachments, retype fifteen numbers, decide what
+    happens to it. Forty times a week. Re-keying into portals is the thing insurance agents name as the
+    worst part of their week. This hands the typing to an AI agent and keeps every decision.
+    Each replay is real tool calls, and each one stops and waits for you to make the call.
+    <span class="demobar__fine">Demonstration only — every business, producer, document and claim below is invented.</span>
+  </p>
+</div>
 
 <main class="desk">
 
@@ -69,7 +88,10 @@
 
   <!-- TRIAGE ----------------------------------------------------------- -->
   <section class="col col--triage">
-    <h2 class="col__title">Triage</h2>
+    <h2 class="col__title">Agent</h2>
+    <div id="transcript" class="card transcript"></div>
+
+    <h2 class="col__title col__title--spaced">Triage</h2>
 
     <div class="card">
       <div class="meter"><div id="meter-fill" class="meter__fill"></div></div>
@@ -114,7 +136,8 @@
 
 <script type="module">
   import { registerAll } from './assets/webmcp.js';
-  registerAll();
+  await registerAll();
+  await import('./assets/demo.js');
 </script>
 </body>
 </html>

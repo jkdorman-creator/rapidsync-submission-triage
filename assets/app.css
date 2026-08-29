@@ -411,3 +411,48 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
   font: inherit; font-size: 12.5px; font-weight: 550; color: var(--accent);
 }
 .email__more:hover { text-decoration: underline; }
+
+/* ---- the scripted replays --------------------------------------------- */
+.playerbar {
+  padding: 11px 22px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.playerbar__row { display: flex; align-items: stretch; gap: 9px; flex-wrap: wrap; }
+.playerbar__label {
+  align-self: center; font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 650; color: var(--muted); margin-right: 3px;
+}
+.playerbar__note { color: var(--muted); font-size: 12.5px; max-width: 96ch; margin: 8px 0 0; }
+.playerbar__note strong { color: var(--ink); font-weight: 600; }
+.btn--play {
+  flex: 0 1 250px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  text-align: left; background: var(--panel); border-color: var(--line); color: inherit;
+  padding: 9px 12px;
+}
+.btn--play:hover { border-color: var(--accent); }
+.btn--play[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.btn[disabled] { opacity: .45; cursor: default; }
+
+.transcript {
+  display: flex; flex-direction: column; gap: 9px; font-size: 13px; line-height: 1.55;
+  max-height: 300px; overflow-y: auto;
+}
+.turn { display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: baseline; }
+.turn__who {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 600; padding-top: 2px;
+}
+.turn--agent .turn__who { color: var(--accent); }
+.turn--you .turn__who { color: var(--ask); }
+.turn__text { min-width: 0; }
+.turn--pending .turn__text::after {
+  content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 5px;
+  border-radius: 50%; background: var(--muted); animation: blink 1.1s steps(2) infinite;
+  vertical-align: middle;
+}
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .turn--pending .turn__text::after { animation: none; }
+  .field--flash { animation: none; }
+  .meter__fill { transition: none; }
+}
