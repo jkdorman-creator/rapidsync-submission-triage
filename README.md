@@ -105,6 +105,17 @@ npm test
 
 `test/shot.mjs` writes screenshots of the desk mid-scenario in both light and dark.
 
+`test/preview.mjs` drives the hosted preview end to end — presses play, answers the question it
+stops on, and checks it resumes to a routing proposal. 28 checks.
+
+### The hosted preview
+
+`build_preview.py` assembles `preview/triage-desk-preview.html`: the same code as the deployed app
+in a single file, with a scripted agent so the desk can be watched without an agent attached. It
+calls the same registered tools in the same order, and it stops and waits for a person at exactly
+the point the real one does. PDF.js is left out of that build; `read_attachment` returns the text
+PDF.js produced at build time, captured by `test/dump-text.mjs`, so tool output is identical.
+
 ---
 
 ## The demo
@@ -130,6 +141,8 @@ assets/vendor/        PDF.js (Apache-2.0), vendored
 docs/                 the synthetic application and loss run PDFs
 test/                 end-to-end scenario, budget checks, screenshots
 build_docs.py         regenerates the demo PDFs
+build_preview.py      assembles the single-file hosted preview
+preview/              the assembled preview
 ```
 
 ## License

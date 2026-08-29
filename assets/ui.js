@@ -163,6 +163,9 @@ export async function extractAttachment(attachmentId) {
   return chunks.map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
 }
 
+// Exposed so the build step can capture exactly what PDF.js produces.
+if (typeof window !== 'undefined') window.__extractForBuild = extractAttachment;
+
 // --- Writing to the record --------------------------------------------------
 export function setFields(values, source = 'agent') {
   const applied = [];

@@ -1,0 +1,74 @@
+// Drives the hosted preview the way a viewer would: press play, answer the
+// question it stops on, press continue, and check where it lands.
+import { chromium } from 'playwright';
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+const ROOT = path.resolve('preview');
+const server = http.createServer((req, res) => {
+  const f = path.join(ROOT, 'triage-desk-preview.html');
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  fs.createReadStream(f).pipe(res);
+});
+await new Promise(r => server.listen(0, r));
+const base = 'http://localhost:' + server.address().port;
+
+const results = [];
+const check = (l, p, e = '') => results.push({ l, p, e });
+const browser = await chromium.launch();
+
+for (const scheme of ['light', 'dark']) {
+  const page = await browser.newPage({ viewport: { width: 1560, height: 1200 }, colorScheme: scheme, deviceScaleFactor: 2 });
+  const errs = [];
+  page.on('pageerror', e => errs.push(String(e)));
+  page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text()) && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
+  await page.goto(base, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(700);
+
+  check(`[${scheme}] page renders the queue`, (await page.locator('.mail').count()) === 3);
+  check(`[${scheme}] tools registered`, (await page.textContent('#tool-status')).includes('ready'));
+
+  await page.click('#play');
+  await page.waitForSelector('.field--asked[data-field="fein"]', { timeout: 25000 });
+  check(`[${scheme}] agent stops and highlights the FEIN`, true);
+  check(`[${scheme}] record filled from the documents`, (await page.inputValue('#f-named_insured')) === 'Cascade Millwork Inc.');
+  check(`[${scheme}] payroll shown with separators`, (await page.inputValue('#f-annual_payroll')) === '$2,692,000');
+  check(`[${scheme}] contradiction is on screen`, (await page.textContent('#findings')).includes('A person has to decide'));
+  check(`[${scheme}] lane is Send for Info`, (await page.locator('[data-lane="send_for_info"].lane--active').count()) === 1);
+  check(`[${scheme}] button invites you to continue`, (await page.textContent('#play')).includes('Continue'));
+
+  if (scheme === 'light') {
+    await page.screenshot({ path: 'test/screens/preview-handoff.png' });
+  }
+
+  // nudging it before answering should be refused
+  await page.click('#play');
+  await page.waitForTimeout(300);
+  check(`[${scheme}] pressing continue early is refused`, (await page.textContent('#transcript')).includes('Still waiting on the FEIN'));
+
+  await page.fill('#f-fein', '38-2841190');
+  await page.dispatchEvent('#f-fein', 'change');
+  await page.click('#play');
+  await page.waitForTimeout(400);
+  check(`[${scheme}] still refuses while the contradiction stands`, (await page.textContent('#transcript')).includes('still contradicts'));
+
+  await page.selectOption('#f-losses_on_app', 'yes');
+  await page.dispatchEvent('#f-losses_on_app', 'change');
+  await page.click('#play');
+  await page.waitForSelector('#routing .btn--primary', { timeout: 25000 });
+  check(`[${scheme}] resumes to a routing proposal`, (await page.textContent('#routing')).includes('Indication'));
+  check(`[${scheme}] nothing routed yet`, !(await page.textContent('#routing')).includes('Routed by the underwriter'));
+
+  await page.click('#routing .btn--primary');
+  await page.waitForTimeout(300);
+  check(`[${scheme}] human approval completes it`, (await page.textContent('#routing')).includes('Routed by the underwriter'));
+  check(`[${scheme}] no page errors`, errs.length === 0, errs.slice(0, 2).join(' | '));
+
+  if (scheme === 'dark') {
+    await page.screenshot({ path: 'test/screens/preview-done-dark.png' });
+  }
+  await page.close();
+}
+await browser.close(); server.close();
+const bad = results.filter(r => !r.p);
+for (const r of results) console.log((r.p ? 'PASS  ' : 'FAIL  ') + r.l + (r.e ? '  [' + r.e + ']' : ''));
+console.log('\n' + (results.length - bad.length) + '/' + results.length + ' passed');
+process.exit(bad.length ? 1 : 0);
