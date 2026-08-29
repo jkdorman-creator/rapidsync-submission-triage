@@ -293,6 +293,7 @@ export function draftReply(subject, body) {
   state.reply = { subject, body, at: new Date() };
   state.replySent = null;
   render();
+  $('#reply').scrollIntoView({ block: 'center', behavior: 'smooth' });
   return state.reply;
 }
 

@@ -143,11 +143,18 @@ PDF.js produced at build time, captured by `test/dump-text.mjs`, so tool output 
 
 Three submissions in the queue, each landing in a different lane:
 
-| Submission | What happens |
-|---|---|
-| **Harbor & Vine Restaurant Group** | Clean and complete. Three years of loss runs, mod 0.92, in appetite. → **Quote Now** |
-| **Ridgeline Roofing** | Producer is pushing hard for a Friday quote. Governing class 5551 is prohibited. → **Likely Decline**, in about twenty seconds. |
-| **Cascade Millwork** | The application and the loss run disagree, and the FEIN is missing. → **Send for Info**, until a person settles it — then **Indication**, because the loss runs only cover two years. The agent then drafts the reply asking for the missing year, and leaves it for the underwriter to send. |
+Each of the three is playable in the hosted preview, and each ends in a different lane with a
+different work product.
+
+| Submission | What happens | It ends with |
+|---|---|---|
+| **Harbor & Vine Restaurant Group** | Clean and complete. Three years of loss runs, mod 0.92, in appetite. Nothing to argue about — and it still stops for your approval. → **Quote Now** | A reply saying terms are coming and nothing is needed from the producer. |
+| **Ridgeline Roofing** | The producer pushes hard for a Friday turnaround and vouches for the mod. The agent reads the application anyway: governing class 5551 is prohibited, so the deadline changes nothing. No loss runs were attached and it does not chase them — there is no point gathering data on a risk you will never write. → **Likely Decline** in about twenty seconds. | A real decline letter, sent the same day so the producer can still place it. |
+| **Cascade Millwork** | The application and the loss run disagree, and the FEIN is missing. → **Send for Info**, until a person settles it — then **Indication**, because the loss runs only cover two years. | An indication, plus a numbered list of exactly what is needed to turn it into a quote. |
+
+The replays have no Continue button. They wait on the actual action — the FEIN typed in, the
+contradiction settled, the routing approved — and resume the moment you do it. Stall and the agent
+tells you what it is still waiting on.
 
 ---
 
