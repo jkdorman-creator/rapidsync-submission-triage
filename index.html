@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Submission Triage Desk — RapidSync Specialty</title>
+<meta name="description" content="A workers compensation submission desk that hands AI agents real tools through WebMCP, and asks a human when it hits something only a person can settle.">
+<link rel="stylesheet" href="assets/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230f172a'/><path d='M9 22V10h6.6a3.7 3.7 0 010 7.4H12l6 4.6' stroke='%2338bdf8' stroke-width='2.2' fill='none' stroke-linejoin='round'/></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="7"/>
+      <path d="M9 22V10h6.6a3.7 3.7 0 010 7.4H12l6 4.6" fill="none" stroke-width="2.2" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <div class="brand__name">RapidSync Specialty</div>
+      <div class="brand__sub">Workers Compensation · Submission Triage Desk</div>
+    </div>
+  </div>
+  <div class="topbar__right">
+    <span id="tool-status" class="pill">Checking for site tools…</span>
+  </div>
+</header>
+
+<p class="demobar">
+  Demonstration only. Every business, producer, document and claim below is invented.
+  Ask your agent: <em>“Work the Cascade Millwork submission.”</em>
+</p>
+
+<main class="desk">
+
+  <!-- QUEUE ------------------------------------------------------------ -->
+  <section class="col col--queue">
+    <h2 class="col__title">Queue</h2>
+    <div id="inbox" class="inbox"></div>
+  </section>
+
+  <!-- WORKSPACE -------------------------------------------------------- -->
+  <section class="col col--work">
+    <h2 class="col__title">Submission</h2>
+    <div id="email" class="card email"></div>
+
+    <h2 class="col__title col__title--spaced">Record</h2>
+    <div id="record" class="record"></div>
+  </section>
+
+  <!-- TRIAGE ----------------------------------------------------------- -->
+  <section class="col col--triage">
+    <h2 class="col__title">Triage</h2>
+
+    <div class="card">
+      <div class="meter"><div id="meter-fill" class="meter__fill"></div></div>
+      <div id="meter-label" class="meter__label">Nothing open</div>
+
+      <div class="lanes">
+        <div class="lane" data-lane="quote_now"><span>Quote Now</span></div>
+        <div class="lane" data-lane="indication"><span>Indication</span></div>
+        <div class="lane" data-lane="send_for_info"><span>Send for Info</span></div>
+        <div class="lane" data-lane="likely_decline"><span>Likely Decline</span></div>
+      </div>
+
+      <div id="findings" class="findings"></div>
+    </div>
+
+    <div id="question" class="card question" hidden></div>
+
+    <h2 class="col__title col__title--spaced">Routing decision</h2>
+    <div id="routing" class="card"></div>
+
+    <h2 class="col__title col__title--spaced">Activity</h2>
+    <div id="activity" class="card activity"></div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <span>Built for the OpenAI WebMCP Challenge, 2026.</span>
+  <span>Seven tools registered through <code>document.modelContext</code>. Nothing routes without a person.</span>
+</footer>
+
+<dialog id="doc-modal" class="modal">
+  <div class="modal__head">
+    <strong id="doc-title"></strong>
+    <button id="doc-close" type="button" class="btn btn--ghost">Close</button>
+  </div>
+  <pre id="doc-body" class="modal__body"></pre>
+</dialog>
+
+<script type="module">
+  import { registerAll } from './assets/webmcp.js';
+  registerAll();
+</script>
+</body>
+</html>
