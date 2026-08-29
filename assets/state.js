@@ -5,22 +5,32 @@
 // ---------------------------------------------------------------------------
 
 export const FIELDS = [
-  { key: 'named_insured',      label: 'Named insured',        group: 'Applicant', required: true,  type: 'text' },
-  { key: 'fein',               label: 'FEIN',                 group: 'Applicant', required: true,  type: 'text' },
+  { key: 'named_insured',      label: 'Named insured',        group: 'Applicant', required: true,  type: 'text',
+    why: 'The policy is issued in this exact legal name. A quote in the wrong name has to be reissued.' },
+  { key: 'fein',               label: 'FEIN',                 group: 'Applicant', required: true,  type: 'text',
+    why: 'Carriers bind and file the policy on the FEIN, and it is how the experience mod is verified with the rating bureau. Without it this cannot be rated, and a quote issued against the wrong entity has to be pulled.' },
   { key: 'entity_type',        label: 'Entity type',          group: 'Applicant', required: false, type: 'text' },
-  { key: 'state',              label: 'State(s) of operation',group: 'Applicant', required: true,  type: 'text' },
+  { key: 'state',              label: 'State(s) of operation',group: 'Applicant', required: true,  type: 'text',
+    why: 'Rates, forms and the governing rating bureau all change by state.' },
   { key: 'years_in_business',  label: 'Years in business',    group: 'Applicant', required: false, type: 'number' },
 
-  { key: 'effective_date',     label: 'Effective date',       group: 'Coverage',  required: true,  type: 'text' },
-  { key: 'experience_mod',     label: 'Experience mod',       group: 'Coverage',  required: true,  type: 'number' },
+  { key: 'effective_date',     label: 'Effective date',       group: 'Coverage',  required: true,  type: 'text',
+    why: 'Sets which rate filing applies, and whether we can even meet the date.' },
+  { key: 'experience_mod',     label: 'Experience mod',       group: 'Coverage',  required: true,  type: 'number',
+    why: 'Multiplies the manual premium, and it is the first appetite test. Guessing at it produces a quote we cannot stand behind.' },
 
-  { key: 'governing_class',    label: 'Governing class code', group: 'Exposure',  required: true,  type: 'text' },
+  { key: 'governing_class',    label: 'Governing class code', group: 'Exposure',  required: true,  type: 'text',
+    why: 'The class carrying the most payroll decides the base rate and whether the risk is in appetite at all.' },
   { key: 'class_description',  label: 'Class description',    group: 'Exposure',  required: false, type: 'text' },
-  { key: 'annual_payroll',     label: 'Total annual payroll', group: 'Exposure',  required: true,  type: 'money' },
-  { key: 'employee_count',     label: 'Employee count',       group: 'Exposure',  required: true,  type: 'number' },
+  { key: 'annual_payroll',     label: 'Total annual payroll', group: 'Exposure',  required: true,  type: 'money',
+    why: 'Premium is rated per $100 of payroll. No payroll, no premium.' },
+  { key: 'employee_count',     label: 'Employee count',       group: 'Exposure',  required: true,  type: 'number',
+    why: 'Sanity-checks the payroll and drives which carriers will look at it.' },
 
-  { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', required: true, type: 'yesno' },
-  { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', required: true, type: 'number' },
+  { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', required: true, type: 'yesno',
+    why: 'What the application itself claims about prior losses. Kept as written even when a loss run disagrees, so the disagreement stays visible.' },
+  { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', required: true, type: 'number',
+    why: 'Three years is the minimum to firm up a quote. Fewer means an indication at best.' },
   { key: 'loss_run_claims',    label: 'Claims shown on loss runs',       group: 'Loss history', required: false, type: 'number' },
   { key: 'loss_run_incurred',  label: 'Total incurred on loss runs',     group: 'Loss history', required: false, type: 'money' },
 
@@ -32,6 +42,7 @@ export const FIELD_KEYS = FIELDS.map(f => f.key);
 const byKey = Object.fromEntries(FIELDS.map(f => [f.key, f]));
 export const fieldLabel = k => (byKey[k] ? byKey[k].label : k);
 export const fieldType  = k => (byKey[k] ? byKey[k].type : 'text');
+export const fieldWhy   = k => (byKey[k] ? byKey[k].why : null);
 
 // --- RapidSync WC appetite. Deterministic, and visible to the underwriter. ---
 export const PROHIBITED_CLASSES = {
@@ -59,7 +70,9 @@ export const state = {
   provenance: {},        // field -> where the value came from
   proposal: null,        // { lane, rationale, decidedBy }
   decision: null,        // { lane, at } once a human confirms
-  pendingQuestion: null, // { field, question }
+  pendingQuestion: null, // { field, question, why }
+  documents: {},         // attachmentId -> { name, kind, text } once read
+  resolutions: {},       // conflict code -> { trusted, label, at, by }
   log: [],               // tool-call activity
 };
 
@@ -69,6 +82,8 @@ export function resetRecord() {
   state.proposal = null;
   state.decision = null;
   state.pendingQuestion = null;
+  state.documents = {};
+  state.resolutions = {};
 }
 
 const num = v => {
@@ -93,6 +108,7 @@ export function evaluate(record = state.record) {
     });
   }
 
+  const incurred = num(record.loss_run_incurred);
   const mod = num(record.experience_mod);
   if (mod !== null && mod > MAX_EXPERIENCE_MOD) {
     appetite.push({
@@ -102,7 +118,6 @@ export function evaluate(record = state.record) {
     });
   }
 
-  const incurred = num(record.loss_run_incurred);
   if (incurred !== null && incurred > MAX_INCURRED) {
     appetite.push({
       code: 'LOSS_SEVERITY',
@@ -111,13 +126,23 @@ export function evaluate(record = state.record) {
     });
   }
 
-  // The contradiction the agent cannot resolve on its own.
+  // The contradiction the agent cannot resolve on its own. It stays open until a
+  // person picks the document that governs - and we keep both readings on the
+  // record either way, so the disagreement never disappears quietly.
   const claims = num(record.loss_run_claims);
-  if (record.losses_on_app === 'no' && claims !== null && claims > 0) {
+  if (record.losses_on_app === 'no' && claims !== null && claims > 0
+      && !state.resolutions.LOSS_DISCLOSURE_MISMATCH) {
     conflicts.push({
       code: 'LOSS_DISCLOSURE_MISMATCH',
-      message: `The application reports no losses, but the loss run shows ${claims} claim${claims === 1 ? '' : 's'}. A person has to decide which document is right.`,
+      message: `The application reports no losses. The loss run shows ${claims} claim${claims === 1 ? '' : 's'}${incurred !== null ? ` and $${incurred.toLocaleString()} incurred` : ''}. Only a person can say which document governs.`,
       fields: ['losses_on_app', 'loss_run_claims'],
+      evidence: evidenceForLossMismatch(),
+      choices: [
+        { id: 'loss_run',    label: 'The loss run governs',
+          detail: 'The application answer was wrong or stale. Price the losses in.' },
+        { id: 'application', label: 'The application governs',
+          detail: 'The loss run belongs to a different entity or period. Set the loss data aside.' },
+      ],
     });
   }
 
@@ -149,6 +174,41 @@ export function evaluate(record = state.record) {
     completeness: Math.round((filled / FIELD_KEYS.length) * 100),
     requiredRemaining: missing.length,
   };
+}
+
+// Finds the line in each document that speaks to the loss question, so the
+// underwriter can check the wording rather than take our word for it.
+function evidenceForLossMismatch() {
+  const out = [];
+  // Up to two matching lines, so a bare column of figures arrives with the
+  // line that explains it.
+  const grab = (doc, patterns) => {
+    if (!doc || !doc.text) return null;
+    const lines = doc.text.split('\n');
+    const hits = [];
+    for (const re of patterns) {
+      const hit = lines.find(l => re.test(l) && !hits.includes(l.trim()));
+      if (hit) hits.push(hit.trim());
+      if (hits.length === 2) break;
+    }
+    return hits.length ? hits.join('  ·  ') : null;
+  };
+  for (const doc of Object.values(state.documents)) {
+    if (/application/i.test(doc.kind)) {
+      const quote = grab(doc, [/losses in past/i, /claims reported/i, /number of claims/i]);
+      if (quote) out.push({ side: 'application', source: doc.name, quote });
+    }
+    if (/loss run/i.test(doc.kind)) {
+      const quote = grab(doc, [/total incurred/i, /TOTAL\s*[-–]\s*\d+\s*claims?/i, /open claims/i]);
+      if (quote) out.push({ side: 'loss_run', source: doc.name, quote });
+    }
+  }
+  return out;
+}
+
+export function resolveConflict(code, choiceId, label) {
+  state.resolutions[code] = { trusted: choiceId, label, at: new Date(), by: 'underwriter' };
+  return state.resolutions[code];
 }
 
 export function isBlank(v) {

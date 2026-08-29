@@ -31,7 +31,23 @@ for (const scheme of ['light', 'dark']) {
   check(`[${scheme}] agent stops and highlights the FEIN`, true);
   check(`[${scheme}] record filled from the documents`, (await page.inputValue('#f-named_insured')) === 'Cascade Millwork Inc.');
   check(`[${scheme}] payroll shown with separators`, (await page.inputValue('#f-annual_payroll')) === '$2,692,000');
-  check(`[${scheme}] contradiction is on screen`, (await page.textContent('#findings')).includes('A person has to decide'));
+  check(`[${scheme}] contradiction is on screen with the receipts`,
+    (await page.textContent('.conflict')).includes('cascade-loss-run.pdf'));
+  check(`[${scheme}] both readings are offered as buttons`, (await page.locator('.btn--choice').count()) === 2);
+  check(`[${scheme}] the loss run quote is legible, not a bare column`,
+    /total incurred/i.test(await page.textContent('.evidence__item--loss_run')));
+
+  // the underwriter can check the source text before deciding
+  await page.click('.conflict .btn--ghost');
+  await page.waitForTimeout(250);
+  const compare = await page.textContent('#doc-modal');
+  check(`[${scheme}] side-by-side view shows both documents`,
+    compare.includes('cascade-application.pdf') && compare.includes('cascade-loss-run.pdf')
+    && compare.includes('MW-784120'));
+  await page.click('#doc-close');
+  await page.waitForTimeout(150);
+  check(`[${scheme}] question panel explains why the FEIN matters`,
+    (await page.textContent('#question')).includes('rating bureau'));
   check(`[${scheme}] lane is Send for Info`, (await page.locator('[data-lane="send_for_info"].lane--active').count()) === 1);
   check(`[${scheme}] button invites you to continue`, (await page.textContent('#play')).includes('Continue'));
 
@@ -48,10 +64,11 @@ for (const scheme of ['light', 'dark']) {
   await page.dispatchEvent('#f-fein', 'change');
   await page.click('#play');
   await page.waitForTimeout(400);
-  check(`[${scheme}] still refuses while the contradiction stands`, (await page.textContent('#transcript')).includes('still contradicts'));
+  check(`[${scheme}] still refuses while the contradiction stands`, (await page.textContent('#transcript')).includes('Still waiting on the losses'));
 
-  await page.selectOption('#f-losses_on_app', 'yes');
-  await page.dispatchEvent('#f-losses_on_app', 'change');
+  await page.click('.btn--choice');
+  await page.waitForTimeout(200);
+  check(`[${scheme}] settling it leaves a trail`, (await page.textContent('#findings')).includes('settled by you'));
   await page.click('#play');
   await page.waitForSelector('#routing .btn--primary', { timeout: 25000 });
   check(`[${scheme}] resumes to a routing proposal`, (await page.textContent('#routing')).includes('Indication'));

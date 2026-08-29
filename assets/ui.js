@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 import {
   FIELDS, FIELD_KEYS, INBOX, LANES, state, evaluate, findSubmission,
-  openSubmission, resetRecord, fieldLabel, isBlank,
+  openSubmission, resetRecord, fieldLabel, fieldWhy, isBlank, resolveConflict,
 } from './state.js';
 
 // Money reads better with separators. State keeps whatever was written; only
@@ -135,8 +135,41 @@ function renderEmail() {
 function showDocument(name, text) {
   const dlg = $('#doc-modal');
   $('#doc-title').textContent = name;
-  $('#doc-body').textContent = text;
+  const body = $('#doc-body');
+  body.className = 'modal__body';
+  body.textContent = text;
   dlg.showModal();
+}
+
+// Both documents, side by side, so a contradiction can be checked against the
+// source text instead of against our summary of it.
+export function compareDocuments() {
+  const docs = Object.values(state.documents);
+  if (docs.length === 0) return false;
+  const dlg = $('#doc-modal');
+  $('#doc-title').textContent = 'The documents, side by side';
+  const body = $('#doc-body');
+  body.className = 'modal__body modal__body--compare';
+  body.textContent = '';
+  for (const doc of docs) {
+    const col = el('div', 'compare__col');
+    const head = el('div', 'compare__head');
+    head.append(el('strong', null, doc.name));
+    head.append(el('span', 'compare__kind', doc.kind));
+    col.append(head);
+    col.append(el('pre', 'compare__text', doc.text));
+    body.append(col);
+  }
+  dlg.showModal();
+  return true;
+}
+
+export function resolveConflictByHand(code, choiceId, label) {
+  resolveConflict(code, choiceId, label);
+  logToolCall('(underwriter)', `Settled the contradiction — ${label}`, 'human');
+  state.proposal = null;
+  state.decision = null;
+  render();
 }
 
 // --- Reading a PDF. The page can do this; the agent cannot. -----------------
@@ -160,7 +193,9 @@ export async function extractAttachment(attachmentId) {
     }
     if (line.length) chunks.push(line.join(' '));
   }
-  return chunks.map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+  const text = chunks.map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+  state.documents[attachmentId] = { name: att.name, kind: att.kind, text };
+  return text;
 }
 
 // Exposed so the build step can capture exactly what PDF.js produces.
@@ -197,8 +232,8 @@ function flash(keys) {
 }
 
 // --- Asking the human -------------------------------------------------------
-export function askUnderwriter(field, question) {
-  state.pendingQuestion = { field, question };
+export function askUnderwriter(field, question, why) {
+  state.pendingQuestion = { field, question, why: why || fieldWhy(field) };
   render();
   const input = document.querySelector(`[data-field="${field}"] input, [data-field="${field}"] select`);
   if (input) {
@@ -314,7 +349,58 @@ function renderRules() {
     findings.append(b);
   };
   add('stop', 'Appetite', r.appetite);
-  add('conflict', 'Contradiction — needs a person', r.conflicts);
+
+  // A contradiction is not a bullet point. Show what each document actually
+  // says, and give the underwriter the two buttons that settle it.
+  for (const c of r.conflicts) {
+    const box = el('div', 'conflict');
+    box.append(el('div', 'conflict__title', 'Contradiction — only you can settle this'));
+    box.append(el('p', 'conflict__message', c.message));
+
+    if (c.evidence && c.evidence.length) {
+      const ev = el('div', 'evidence');
+      for (const e of c.evidence) {
+        const card = el('div', `evidence__item evidence__item--${e.side}`);
+        card.append(el('div', 'evidence__source', e.source));
+        card.append(el('q', 'evidence__quote', e.quote));
+        ev.append(card);
+      }
+      box.append(ev);
+    } else {
+      box.append(el('p', 'conflict__hint',
+        'Read both documents to see the wording each one uses.'));
+    }
+
+    const actions = el('div', 'conflict__actions');
+    for (const choice of c.choices || []) {
+      const btn = el('button', 'btn btn--choice');
+      btn.type = 'button';
+      btn.append(el('span', 'btn__label', choice.label));
+      btn.append(el('span', 'btn__detail', choice.detail));
+      btn.addEventListener('click', () => resolveConflictByHand(c.code, choice.id, choice.label));
+      actions.append(btn);
+    }
+    box.append(actions);
+
+    if (Object.keys(state.documents).length) {
+      const compare = el('button', 'btn btn--ghost btn--wide', 'Check both documents side by side');
+      compare.type = 'button';
+      compare.addEventListener('click', compareDocuments);
+      box.append(compare);
+    }
+    findings.append(box);
+  }
+
+  // Once settled, say so and leave the trail.
+  for (const [code, res] of Object.entries(state.resolutions)) {
+    const settled = el('div', 'finding finding--settled');
+    settled.append(el('div', 'finding__title', 'Contradiction settled by you'));
+    const ul = el('ul');
+    ul.append(el('li', null, `${res.label}. Both readings stay on the record.`));
+    settled.append(ul);
+    findings.append(settled);
+  }
+
   add('missing', 'Missing to quote', r.missing.map(k => fieldLabel(k)));
   add('note', 'Limits what we can offer', r.notes);
   if (!findings.children.length && state.openSubmissionId) {
@@ -325,13 +411,31 @@ function renderRules() {
   const qbox = $('#question');
   qbox.innerHTML = '';
   if (state.pendingQuestion) {
+    const q = state.pendingQuestion;
     qbox.hidden = false;
-    qbox.append(el('div', 'question__label', `Your agent needs: ${fieldLabel(state.pendingQuestion.field)}`));
-    qbox.append(el('div', 'question__text', state.pendingQuestion.question));
+    qbox.append(el('div', 'question__label', 'Action needed from you'));
+    qbox.append(el('div', 'question__do', `Enter the ${fieldLabel(q.field).toLowerCase()}`));
+    qbox.append(el('p', 'question__text', q.question));
+    if (q.why) {
+      const why = el('div', 'question__why');
+      why.append(el('span', 'question__whylabel', 'Why it is needed'));
+      why.append(el('p', 'question__whytext', q.why));
+      qbox.append(why);
+    }
+    const actions = el('div', 'question__actions');
+    const go = el('button', 'btn btn--primary', `Go to ${fieldLabel(q.field)}`);
+    go.type = 'button';
+    go.addEventListener('click', () => {
+      const input = document.querySelector(`[data-field="${q.field}"] input, [data-field="${q.field}"] select`);
+      if (input) { input.scrollIntoView({ block: 'center', behavior: 'smooth' }); input.focus(); }
+    });
     const dismiss = el('button', 'btn btn--ghost', 'Dismiss');
     dismiss.type = 'button';
     dismiss.addEventListener('click', clearQuestion);
-    qbox.append(dismiss);
+    actions.append(go, dismiss);
+    qbox.append(actions);
+    qbox.append(el('p', 'question__pickup',
+      'Type it into the record and your agent picks it up the next time it checks. You can also just tell the agent.'));
   } else {
     qbox.hidden = true;
   }
@@ -366,7 +470,21 @@ function renderRules() {
 }
 
 // --- Top-level render -------------------------------------------------------
+function renderAlert() {
+  const r = evaluate();
+  const needs = (state.pendingQuestion ? 1 : 0) + r.conflicts.length;
+  const pill = $('#needs-you');
+  if (!state.openSubmissionId || needs === 0) { pill.hidden = true; return; }
+  pill.hidden = false;
+  pill.textContent = needs === 1 ? '1 thing needs you' : `${needs} things need you`;
+  pill.onclick = () => {
+    const target = state.pendingQuestion ? $('#question') : $('#findings');
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+}
+
 export function render() {
+  renderAlert();
   renderInbox();
   renderEmail();
   renderRecord();

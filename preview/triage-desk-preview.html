@@ -227,6 +227,81 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
   color: var(--muted); font-size: 12px; background: var(--panel);
 }
 
+/* ---- something needs the underwriter ---------------------------------- */
+.pill--needs {
+  cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 550;
+  background: color-mix(in srgb, var(--ask) 14%, var(--panel));
+  border-color: var(--ask); color: var(--ask);
+}
+.pill--needs:hover { background: color-mix(in srgb, var(--ask) 22%, var(--panel)); }
+
+/* ---- a contradiction gets its own card, with the receipts -------------- */
+.conflict {
+  border: 1px solid var(--ask); border-radius: 10px; padding: 13px;
+  background: color-mix(in srgb, var(--ask) 7%, var(--panel));
+}
+.conflict__title {
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em;
+  font-weight: 650; color: var(--ask); margin-bottom: 7px;
+}
+.conflict__message { margin: 0 0 12px; font-size: 12.5px; line-height: 1.55; }
+.conflict__hint { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+.evidence { display: grid; gap: 8px; margin-bottom: 13px; }
+.evidence__item {
+  border-left: 3px solid var(--line); padding: 7px 0 7px 10px;
+  background: var(--panel); border-radius: 0 7px 7px 0;
+}
+.evidence__item--application { border-left-color: var(--warn); }
+.evidence__item--loss_run { border-left-color: var(--accent); }
+.evidence__source {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px; color: var(--muted); margin-bottom: 3px;
+}
+.evidence__quote { display: block; font-size: 12px; line-height: 1.5; quotes: none; }
+.conflict__actions { display: grid; gap: 7px; margin-bottom: 9px; }
+.btn--choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  text-align: left; background: var(--panel); border-color: var(--line); color: inherit;
+  padding: 9px 12px;
+}
+.btn--choice:hover { border-color: var(--ask); }
+.btn__label { font-weight: 600; font-size: 13px; }
+.btn__detail { font-weight: 400; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+.btn--wide { width: 100%; }
+.finding--settled { border-color: var(--ok); }
+.finding--settled .finding__title { color: var(--ok); }
+
+/* ---- the question panel, made unmissable ------------------------------ */
+.question__do { font-size: 17px; font-weight: 650; letter-spacing: -.01em; margin-bottom: 7px; }
+.question__text { margin: 0 0 11px; font-size: 13px; line-height: 1.55; }
+.question__why {
+  background: var(--panel); border-radius: 8px; padding: 9px 11px; margin-bottom: 12px;
+}
+.question__whylabel {
+  display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 650; color: var(--muted); margin-bottom: 4px;
+}
+.question__whytext { margin: 0; font-size: 12.5px; line-height: 1.5; }
+.question__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.question__pickup { margin: 10px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
+/* ---- side by side document check -------------------------------------- */
+.modal__body--compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-family: inherit;
+}
+@media (max-width: 700px) { .modal__body--compare { grid-template-columns: 1fr; } }
+.compare__col { min-width: 0; }
+.compare__head {
+  display: flex; flex-direction: column; gap: 2px; padding-bottom: 7px;
+  margin-bottom: 9px; border-bottom: 1px solid var(--line);
+}
+.compare__head strong { font-size: 12.5px; }
+.compare__kind { font-size: 11.5px; color: var(--muted); }
+.compare__text {
+  margin: 0; white-space: pre-wrap; font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px; line-height: 1.6;
+}
+
 
 /* ---- hosted preview only: the scripted agent -------------------------- */
 .playerbar {
@@ -271,6 +346,7 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
     </div>
   </div>
   <div class="topbar__right">
+    <button id="needs-you" class="pill pill--needs" type="button" hidden></button>
     <span id="tool-status" class="pill">Checking for site tools…</span>
   </div>
 </header>
@@ -375,22 +451,32 @@ if (!('modelContext' in document)) {
 // ---------------------------------------------------------------------------
 
 const FIELDS = [
-  { key: 'named_insured',      label: 'Named insured',        group: 'Applicant', required: true,  type: 'text' },
-  { key: 'fein',               label: 'FEIN',                 group: 'Applicant', required: true,  type: 'text' },
+  { key: 'named_insured',      label: 'Named insured',        group: 'Applicant', required: true,  type: 'text',
+    why: 'The policy is issued in this exact legal name. A quote in the wrong name has to be reissued.' },
+  { key: 'fein',               label: 'FEIN',                 group: 'Applicant', required: true,  type: 'text',
+    why: 'Carriers bind and file the policy on the FEIN, and it is how the experience mod is verified with the rating bureau. Without it this cannot be rated, and a quote issued against the wrong entity has to be pulled.' },
   { key: 'entity_type',        label: 'Entity type',          group: 'Applicant', required: false, type: 'text' },
-  { key: 'state',              label: 'State(s) of operation',group: 'Applicant', required: true,  type: 'text' },
+  { key: 'state',              label: 'State(s) of operation',group: 'Applicant', required: true,  type: 'text',
+    why: 'Rates, forms and the governing rating bureau all change by state.' },
   { key: 'years_in_business',  label: 'Years in business',    group: 'Applicant', required: false, type: 'number' },
 
-  { key: 'effective_date',     label: 'Effective date',       group: 'Coverage',  required: true,  type: 'text' },
-  { key: 'experience_mod',     label: 'Experience mod',       group: 'Coverage',  required: true,  type: 'number' },
+  { key: 'effective_date',     label: 'Effective date',       group: 'Coverage',  required: true,  type: 'text',
+    why: 'Sets which rate filing applies, and whether we can even meet the date.' },
+  { key: 'experience_mod',     label: 'Experience mod',       group: 'Coverage',  required: true,  type: 'number',
+    why: 'Multiplies the manual premium, and it is the first appetite test. Guessing at it produces a quote we cannot stand behind.' },
 
-  { key: 'governing_class',    label: 'Governing class code', group: 'Exposure',  required: true,  type: 'text' },
+  { key: 'governing_class',    label: 'Governing class code', group: 'Exposure',  required: true,  type: 'text',
+    why: 'The class carrying the most payroll decides the base rate and whether the risk is in appetite at all.' },
   { key: 'class_description',  label: 'Class description',    group: 'Exposure',  required: false, type: 'text' },
-  { key: 'annual_payroll',     label: 'Total annual payroll', group: 'Exposure',  required: true,  type: 'money' },
-  { key: 'employee_count',     label: 'Employee count',       group: 'Exposure',  required: true,  type: 'number' },
+  { key: 'annual_payroll',     label: 'Total annual payroll', group: 'Exposure',  required: true,  type: 'money',
+    why: 'Premium is rated per $100 of payroll. No payroll, no premium.' },
+  { key: 'employee_count',     label: 'Employee count',       group: 'Exposure',  required: true,  type: 'number',
+    why: 'Sanity-checks the payroll and drives which carriers will look at it.' },
 
-  { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', required: true, type: 'yesno' },
-  { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', required: true, type: 'number' },
+  { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', required: true, type: 'yesno',
+    why: 'What the application itself claims about prior losses. Kept as written even when a loss run disagrees, so the disagreement stays visible.' },
+  { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', required: true, type: 'number',
+    why: 'Three years is the minimum to firm up a quote. Fewer means an indication at best.' },
   { key: 'loss_run_claims',    label: 'Claims shown on loss runs',       group: 'Loss history', required: false, type: 'number' },
   { key: 'loss_run_incurred',  label: 'Total incurred on loss runs',     group: 'Loss history', required: false, type: 'money' },
 
@@ -402,6 +488,7 @@ const FIELD_KEYS = FIELDS.map(f => f.key);
 const byKey = Object.fromEntries(FIELDS.map(f => [f.key, f]));
 const fieldLabel = k => (byKey[k] ? byKey[k].label : k);
 const fieldType  = k => (byKey[k] ? byKey[k].type : 'text');
+const fieldWhy   = k => (byKey[k] ? byKey[k].why : null);
 
 // --- RapidSync WC appetite. Deterministic, and visible to the underwriter. ---
 const PROHIBITED_CLASSES = {
@@ -429,7 +516,9 @@ const state = {
   provenance: {},        // field -> where the value came from
   proposal: null,        // { lane, rationale, decidedBy }
   decision: null,        // { lane, at } once a human confirms
-  pendingQuestion: null, // { field, question }
+  pendingQuestion: null, // { field, question, why }
+  documents: {},         // attachmentId -> { name, kind, text } once read
+  resolutions: {},       // conflict code -> { trusted, label, at, by }
   log: [],               // tool-call activity
 };
 
@@ -439,6 +528,8 @@ function resetRecord() {
   state.proposal = null;
   state.decision = null;
   state.pendingQuestion = null;
+  state.documents = {};
+  state.resolutions = {};
 }
 
 const num = v => {
@@ -463,6 +554,7 @@ function evaluate(record = state.record) {
     });
   }
 
+  const incurred = num(record.loss_run_incurred);
   const mod = num(record.experience_mod);
   if (mod !== null && mod > MAX_EXPERIENCE_MOD) {
     appetite.push({
@@ -472,7 +564,6 @@ function evaluate(record = state.record) {
     });
   }
 
-  const incurred = num(record.loss_run_incurred);
   if (incurred !== null && incurred > MAX_INCURRED) {
     appetite.push({
       code: 'LOSS_SEVERITY',
@@ -481,13 +572,23 @@ function evaluate(record = state.record) {
     });
   }
 
-  // The contradiction the agent cannot resolve on its own.
+  // The contradiction the agent cannot resolve on its own. It stays open until a
+  // person picks the document that governs - and we keep both readings on the
+  // record either way, so the disagreement never disappears quietly.
   const claims = num(record.loss_run_claims);
-  if (record.losses_on_app === 'no' && claims !== null && claims > 0) {
+  if (record.losses_on_app === 'no' && claims !== null && claims > 0
+      && !state.resolutions.LOSS_DISCLOSURE_MISMATCH) {
     conflicts.push({
       code: 'LOSS_DISCLOSURE_MISMATCH',
-      message: `The application reports no losses, but the loss run shows ${claims} claim${claims === 1 ? '' : 's'}. A person has to decide which document is right.`,
+      message: `The application reports no losses. The loss run shows ${claims} claim${claims === 1 ? '' : 's'}${incurred !== null ? ` and $${incurred.toLocaleString()} incurred` : ''}. Only a person can say which document governs.`,
       fields: ['losses_on_app', 'loss_run_claims'],
+      evidence: evidenceForLossMismatch(),
+      choices: [
+        { id: 'loss_run',    label: 'The loss run governs',
+          detail: 'The application answer was wrong or stale. Price the losses in.' },
+        { id: 'application', label: 'The application governs',
+          detail: 'The loss run belongs to a different entity or period. Set the loss data aside.' },
+      ],
     });
   }
 
@@ -519,6 +620,41 @@ function evaluate(record = state.record) {
     completeness: Math.round((filled / FIELD_KEYS.length) * 100),
     requiredRemaining: missing.length,
   };
+}
+
+// Finds the line in each document that speaks to the loss question, so the
+// underwriter can check the wording rather than take our word for it.
+function evidenceForLossMismatch() {
+  const out = [];
+  // Up to two matching lines, so a bare column of figures arrives with the
+  // line that explains it.
+  const grab = (doc, patterns) => {
+    if (!doc || !doc.text) return null;
+    const lines = doc.text.split('\n');
+    const hits = [];
+    for (const re of patterns) {
+      const hit = lines.find(l => re.test(l) && !hits.includes(l.trim()));
+      if (hit) hits.push(hit.trim());
+      if (hits.length === 2) break;
+    }
+    return hits.length ? hits.join('  ·  ') : null;
+  };
+  for (const doc of Object.values(state.documents)) {
+    if (/application/i.test(doc.kind)) {
+      const quote = grab(doc, [/losses in past/i, /claims reported/i, /number of claims/i]);
+      if (quote) out.push({ side: 'application', source: doc.name, quote });
+    }
+    if (/loss run/i.test(doc.kind)) {
+      const quote = grab(doc, [/total incurred/i, /TOTAL\s*[-–]\s*\d+\s*claims?/i, /open claims/i]);
+      if (quote) out.push({ side: 'loss_run', source: doc.name, quote });
+    }
+  }
+  return out;
+}
+
+function resolveConflict(code, choiceId, label) {
+  state.resolutions[code] = { trusted: choiceId, label, at: new Date(), by: 'underwriter' };
+  return state.resolutions[code];
 }
 
 function isBlank(v) {
@@ -728,8 +864,41 @@ function renderEmail() {
 function showDocument(name, text) {
   const dlg = $('#doc-modal');
   $('#doc-title').textContent = name;
-  $('#doc-body').textContent = text;
+  const body = $('#doc-body');
+  body.className = 'modal__body';
+  body.textContent = text;
   dlg.showModal();
+}
+
+// Both documents, side by side, so a contradiction can be checked against the
+// source text instead of against our summary of it.
+function compareDocuments() {
+  const docs = Object.values(state.documents);
+  if (docs.length === 0) return false;
+  const dlg = $('#doc-modal');
+  $('#doc-title').textContent = 'The documents, side by side';
+  const body = $('#doc-body');
+  body.className = 'modal__body modal__body--compare';
+  body.textContent = '';
+  for (const doc of docs) {
+    const col = el('div', 'compare__col');
+    const head = el('div', 'compare__head');
+    head.append(el('strong', null, doc.name));
+    head.append(el('span', 'compare__kind', doc.kind));
+    col.append(head);
+    col.append(el('pre', 'compare__text', doc.text));
+    body.append(col);
+  }
+  dlg.showModal();
+  return true;
+}
+
+function resolveConflictByHand(code, choiceId, label) {
+  resolveConflict(code, choiceId, label);
+  logToolCall('(underwriter)', `Settled the contradiction — ${label}`, 'human');
+  state.proposal = null;
+  state.decision = null;
+  render();
 }
 
 // --- Reading a PDF. The page can do this; the agent cannot. -----------------
@@ -741,6 +910,7 @@ async function extractAttachment(attachmentId) {
   await new Promise(r => setTimeout(r, 260));   // the real parse is not instant either
   const text = EXTRACTED[attachmentId];
   if (!text) throw new Error('no text captured for ' + attachmentId);
+  state.documents[attachmentId] = { name: att.name, kind: att.kind, text };
   return text;
 }
 
@@ -778,8 +948,8 @@ function flash(keys) {
 }
 
 // --- Asking the human -------------------------------------------------------
-function askUnderwriter(field, question) {
-  state.pendingQuestion = { field, question };
+function askUnderwriter(field, question, why) {
+  state.pendingQuestion = { field, question, why: why || fieldWhy(field) };
   render();
   const input = document.querySelector(`[data-field="${field}"] input, [data-field="${field}"] select`);
   if (input) {
@@ -895,7 +1065,58 @@ function renderRules() {
     findings.append(b);
   };
   add('stop', 'Appetite', r.appetite);
-  add('conflict', 'Contradiction — needs a person', r.conflicts);
+
+  // A contradiction is not a bullet point. Show what each document actually
+  // says, and give the underwriter the two buttons that settle it.
+  for (const c of r.conflicts) {
+    const box = el('div', 'conflict');
+    box.append(el('div', 'conflict__title', 'Contradiction — only you can settle this'));
+    box.append(el('p', 'conflict__message', c.message));
+
+    if (c.evidence && c.evidence.length) {
+      const ev = el('div', 'evidence');
+      for (const e of c.evidence) {
+        const card = el('div', `evidence__item evidence__item--${e.side}`);
+        card.append(el('div', 'evidence__source', e.source));
+        card.append(el('q', 'evidence__quote', e.quote));
+        ev.append(card);
+      }
+      box.append(ev);
+    } else {
+      box.append(el('p', 'conflict__hint',
+        'Read both documents to see the wording each one uses.'));
+    }
+
+    const actions = el('div', 'conflict__actions');
+    for (const choice of c.choices || []) {
+      const btn = el('button', 'btn btn--choice');
+      btn.type = 'button';
+      btn.append(el('span', 'btn__label', choice.label));
+      btn.append(el('span', 'btn__detail', choice.detail));
+      btn.addEventListener('click', () => resolveConflictByHand(c.code, choice.id, choice.label));
+      actions.append(btn);
+    }
+    box.append(actions);
+
+    if (Object.keys(state.documents).length) {
+      const compare = el('button', 'btn btn--ghost btn--wide', 'Check both documents side by side');
+      compare.type = 'button';
+      compare.addEventListener('click', compareDocuments);
+      box.append(compare);
+    }
+    findings.append(box);
+  }
+
+  // Once settled, say so and leave the trail.
+  for (const [code, res] of Object.entries(state.resolutions)) {
+    const settled = el('div', 'finding finding--settled');
+    settled.append(el('div', 'finding__title', 'Contradiction settled by you'));
+    const ul = el('ul');
+    ul.append(el('li', null, `${res.label}. Both readings stay on the record.`));
+    settled.append(ul);
+    findings.append(settled);
+  }
+
   add('missing', 'Missing to quote', r.missing.map(k => fieldLabel(k)));
   add('note', 'Limits what we can offer', r.notes);
   if (!findings.children.length && state.openSubmissionId) {
@@ -906,13 +1127,31 @@ function renderRules() {
   const qbox = $('#question');
   qbox.innerHTML = '';
   if (state.pendingQuestion) {
+    const q = state.pendingQuestion;
     qbox.hidden = false;
-    qbox.append(el('div', 'question__label', `Your agent needs: ${fieldLabel(state.pendingQuestion.field)}`));
-    qbox.append(el('div', 'question__text', state.pendingQuestion.question));
+    qbox.append(el('div', 'question__label', 'Action needed from you'));
+    qbox.append(el('div', 'question__do', `Enter the ${fieldLabel(q.field).toLowerCase()}`));
+    qbox.append(el('p', 'question__text', q.question));
+    if (q.why) {
+      const why = el('div', 'question__why');
+      why.append(el('span', 'question__whylabel', 'Why it is needed'));
+      why.append(el('p', 'question__whytext', q.why));
+      qbox.append(why);
+    }
+    const actions = el('div', 'question__actions');
+    const go = el('button', 'btn btn--primary', `Go to ${fieldLabel(q.field)}`);
+    go.type = 'button';
+    go.addEventListener('click', () => {
+      const input = document.querySelector(`[data-field="${q.field}"] input, [data-field="${q.field}"] select`);
+      if (input) { input.scrollIntoView({ block: 'center', behavior: 'smooth' }); input.focus(); }
+    });
     const dismiss = el('button', 'btn btn--ghost', 'Dismiss');
     dismiss.type = 'button';
     dismiss.addEventListener('click', clearQuestion);
-    qbox.append(dismiss);
+    actions.append(go, dismiss);
+    qbox.append(actions);
+    qbox.append(el('p', 'question__pickup',
+      'Type it into the record and your agent picks it up the next time it checks. You can also just tell the agent.'));
   } else {
     qbox.hidden = true;
   }
@@ -947,7 +1186,21 @@ function renderRules() {
 }
 
 // --- Top-level render -------------------------------------------------------
+function renderAlert() {
+  const r = evaluate();
+  const needs = (state.pendingQuestion ? 1 : 0) + r.conflicts.length;
+  const pill = $('#needs-you');
+  if (!state.openSubmissionId || needs === 0) { pill.hidden = true; return; }
+  pill.hidden = false;
+  pill.textContent = needs === 1 ? '1 thing needs you' : `${needs} things need you`;
+  pill.onclick = () => {
+    const target = state.pendingQuestion ? $('#question') : $('#findings');
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+}
+
 function render() {
+  renderAlert();
   renderInbox();
   renderEmail();
   renderRecord();
@@ -1001,6 +1254,7 @@ const RECORD_PROPERTIES = {
   loss_run_years:    { type: 'number', description: 'How many policy years the attached loss runs actually cover.' },
   loss_run_claims:   { type: 'number', description: 'Number of claims listed on the loss runs.' },
   loss_run_incurred: { type: 'number', description: 'Total incurred across all claims on the loss runs, as a number.' },
+  source_document:   { type: 'string', description: 'Attachment id these values came from, so the record shows which document each fact is based on. Omit for facts taken from the email body.' },
 };
 
 const TOOLS = [
@@ -1103,10 +1357,17 @@ const TOOLS = [
     async execute(input) {
       if (!openSubmission()) return 'No submission is open. Call open_submission first.';
       const values = input && typeof input === 'object' ? input : {};
-      if (Object.keys(values).length === 0) {
+      if (Object.keys(values).filter(k => k !== 'source_document').length === 0) {
         return 'Nothing sent. Pass at least one field, for example {"named_insured": "Acme Inc."}.';
       }
-      const { applied, rejected } = setFields(values, 'agent');
+      const src = values.source_document ? String(values.source_document).trim() : null;
+      const sub = openSubmission();
+      const doc = src ? sub.attachments.find(a => a.id === src) : null;
+      if (src && !doc) {
+        return `"${src}" is not an attachment on ${sub.id}. Available: ${sub.attachments.map(a => a.id).join(', ')}. Send the values again with the right id, or leave source_document out.`;
+      }
+      delete values.source_document;
+      const { applied, rejected } = setFields(values, doc ? doc.name : 'agent');
       logToolCall('update_submission', applied.length
         ? `Wrote ${applied.length} field${applied.length === 1 ? '' : 's'} — ${applied.slice(0, 3).map(fieldLabel).join(', ')}${applied.length > 3 ? ` and ${applied.length - 3} more` : ''}`
         : 'Nothing written');
@@ -1132,7 +1393,13 @@ const TOOLS = [
       const r = evaluate();
       const out = [`Current lane: ${r.laneLabel}. ${LANES[r.lane].blurb}`, `Record is ${r.completeness}% captured.`];
       if (r.appetite.length) out.push('APPETITE PROBLEM: ' + r.appetite.map(a => a.message).join(' '));
-      if (r.conflicts.length) out.push('CONTRADICTION: ' + r.conflicts.map(c => c.message).join(' '));
+      if (r.conflicts.length) {
+        out.push('CONTRADICTION: ' + r.conflicts.map(c => c.message).join(' '));
+        out.push('The page is showing the underwriter the exact line from each document and two buttons to pick which one governs. Tell them it is waiting; you cannot settle it yourself.');
+      }
+      for (const res of Object.values(state.resolutions)) {
+        out.push(`SETTLED BY THE UNDERWRITER: ${res.label}.`);
+      }
       if (r.missing.length) out.push('MISSING TO QUOTE: ' + r.missing.map(fieldLabel).join(', ') + '.');
       if (r.notes.length) out.push('LIMITS THE OFFER: ' + r.notes.map(n => n.message).join(' '));
       if (!r.appetite.length && !r.conflicts.length && !r.missing.length && !r.notes.length) {
@@ -1149,17 +1416,18 @@ const TOOLS = [
     name: 'ask_underwriter',
     title: 'Ask the underwriter for help',
     description:
-      'Highlights one field on screen and puts a question to the human underwriter. Use it when a value is missing from every document, is unreadable, or when two documents disagree and only a person can decide. Returns the question to say out loud. Does not change the record.',
+      'Raises one field to the human underwriter: highlights it, explains why it matters, and puts a question to them. Use when a value is missing from every document, is unreadable, or when documents disagree. Returns the words to say to the user. Changes no data. The page supplies the standard reason a field is needed, so you only pass why if you know something more specific.',
     inputSchema: {
       type: 'object',
       properties: {
         field: { type: 'string', enum: FIELD_KEYS, description: 'Which field on the record the underwriter needs to settle.' },
         question: { type: 'string', description: 'The question in plain language, saying what you found and what you need from them.' },
+        why: { type: 'string', description: 'Optional. Why this value matters here, if you know something the page does not.' },
       },
       required: ['field', 'question'],
     },
     annotations: { readOnlyHint: true, untrustedContentHint: false },
-    async execute({ field, question }) {
+    async execute({ field, question, why }) {
       if (!openSubmission()) return 'No submission is open. Call open_submission first.';
       const key = String(field || '').trim();
       if (!FIELD_KEYS.includes(key)) {
@@ -1167,9 +1435,15 @@ const TOOLS = [
       }
       const q = String(question || '').trim();
       if (!q) return 'Pass a question. The underwriter needs to know what you are asking for and why.';
-      askUnderwriter(key, q);
-      logToolCall('ask_underwriter', `Asked about ${fieldLabel(key)}`, 'ask');
-      return `Highlighted "${fieldLabel(key)}" on screen and focused it. Now put this to the user and wait for their answer: ${q}`;
+      const reason = (why && String(why).trim()) || fieldWhy(key);
+      askUnderwriter(key, q, reason);
+      logToolCall('ask_underwriter', `Asked for ${fieldLabel(key)}`, 'ask');
+      return [
+        `On screen: "${fieldLabel(key)}" is highlighted, with a Go to the field button and the reason it is needed.`,
+        `Say this to the user: ${q}`,
+        reason ? `If they ask why it matters: ${reason}` : '',
+        'They can type it into the record or tell you. Call check_submission again once they answer.',
+      ].filter(Boolean).join('\n');
     },
   },
 
@@ -1309,10 +1583,16 @@ async function play() {
     named_insured: 'Cascade Millwork Inc.', entity_type: 'Corporation', state: 'MI',
     years_in_business: 19, effective_date: '10/01/2026', experience_mod: 1.18,
     governing_class: '2802', class_description: 'Carpentry shop - woodworking',
-    annual_payroll: 2692000, employee_count: 55,
-    losses_on_app: 'no', loss_run_years: 2, loss_run_claims: 4, loss_run_incurred: 92400,
+    annual_payroll: 2692000, employee_count: 55, losses_on_app: 'no',
+    source_document: 'ATT-4502-A',
   });
-  await wait(1100);
+  await wait(900);
+  say('agent', 'And the loss run figures, kept separate so you can see which document each fact came from.');
+  await run('update_submission', {
+    loss_run_years: 2, loss_run_claims: 4, loss_run_incurred: 92400,
+    source_document: 'ATT-4502-B',
+  });
+  await wait(1000);
 
   t = say('agent', 'Running your underwriting rules…', true);
   await run('check_submission'); await wait(800);
@@ -1320,15 +1600,15 @@ async function play() {
   say('agent', 'Two problems. The application says no prior losses, but the loss run shows four claims and $92,400 incurred, including a finger amputation. And the FEIN was left blank.');
   await wait(1400);
 
-  say('agent', 'I can read both documents but I cannot tell you which one is right. That is your call.');
-  await wait(1000);
+  say('agent', 'I can read both documents but I cannot tell you which one governs. That is your call, so I have put the exact line from each one on screen with the two buttons that settle it.');
+  await wait(1400);
 
   await run('ask_underwriter', {
     field: 'fein',
-    question: 'The application left the FEIN blank and the loss run does not carry it either. Can you pull it from the prior policy? And the loss disclosure on the application contradicts the loss run — which one should I trust?',
+    question: 'The application left the FEIN blank and the loss run does not carry it either — can you pull it from the prior policy?',
   });
   document.getElementById('question').classList.add('waiting');
-  say('agent', 'Over to you — I have highlighted the FEIN field on the record. Fill it in, and set the loss disclosure to match whichever document you trust.');
+  say('agent', 'Two things need you: enter the FEIN, and pick which document governs on the losses. Both are marked on the right.');
   playBtn.disabled = false;
   playBtn.textContent = 'Continue once you have answered';
   playBtn.onclick = resume;
@@ -1339,24 +1619,25 @@ async function resume() {
   if (running) return;
   const r = evaluate();
   if (isBlank(state.record.fein)) {
-    say('agent', 'Still waiting on the FEIN — it is the highlighted field on the record.');
+    say('agent', 'Still waiting on the FEIN. It is the highlighted field on the record — the panel says why it blocks rating.');
     return;
   }
   if (r.conflicts.length) {
-    say('agent', 'The loss disclosure still contradicts the loss run. Set "Losses disclosed on application" to whichever document you trust.');
+    say('agent', 'Still waiting on the losses. Read the two quotes on the right and press whichever button matches — the loss run governs, or the application governs.');
     return;
   }
   running = true;
   playBtn.disabled = true;
   playBtn.textContent = 'Working…';
   document.getElementById('question').classList.remove('waiting');
-  say('you', 'Done — FEIN is in, and the loss run is the one to trust.');
+  const settled = Object.values(state.resolutions)[0];
+  say('you', 'Done — FEIN is in' + (settled ? `, and ${settled.label.toLowerCase()}.` : '.'));
   await wait(700);
 
   let t = say('agent', 'Thanks. Re-running the rules…', true);
   await run('check_submission'); await wait(800);
   t.remove();
-  say('agent', 'That clears the contradiction. What is left is the loss runs only cover two years, and you need three to firm up a quote — so this is an indication, not a quote.');
+  say('agent', 'That settles it, and both readings stay on the record so the file shows what each document said. What is left is the loss runs only cover two years, and you need three to firm up a quote — so this is an indication.');
   await wait(1300);
 
   await run('propose_routing', {

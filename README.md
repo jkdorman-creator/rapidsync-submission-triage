@@ -35,9 +35,16 @@ The Cascade Millwork application says, in a checkbox, *no losses in the past thr
 
 An agent working alone picks one and moves on, and it will sometimes pick wrong. A person working alone has to read both documents to notice at all.
 
-Working together: the agent reads both documents and writes down what each one claims. The page's rules see the mismatch and stop. The agent calls `ask_underwriter`, which highlights the field on screen, focuses it, and hands the agent a question to put to the person. The underwriter answers in one click, in the page, and the file moves — from *Send for Info* to *Indication*, for a reason both parties can see.
+Working together: the agent reads both documents, and credits each fact to the document it came from. The page's rules see the mismatch and stop. Then the page does the thing a chat window cannot — it puts **the actual line from each document** on screen, side by side:
 
-**WebMCP has no built-in way for a tool to ask the user something.** There is no elicitation API in the spec; `requestUserInteraction()` is discussed in the working group but not specified, and Chrome's own docs describe it as if it exists. `ask_underwriter` is our answer to that gap: the tool moves the page, and returns the agent a script for the conversation.
+> `cascade-application.pdf` — *Losses in past 3 years? NO - no claims reported*
+> `cascade-loss-run.pdf` — *Total Incurred (period shown) $92,400 · TOTAL - 4 claims*
+
+and two buttons: **the loss run governs** or **the application governs**. One click settles it, and both readings stay on the record so the disagreement never disappears quietly. The file moves from *Send for Info* to *Indication*, for a reason both parties can see. If quoting the lines isn't enough, "check both documents side by side" opens the full extracted text of each.
+
+**WebMCP has no built-in way for a tool to ask the user something.** There is no elicitation API in the spec; `requestUserInteraction()` is discussed in the working group but not specified, and Chrome's own docs describe it as if it exists. So a tool cannot hold a conversation — it can only change the page and return words to the agent. Both of those are used here: `ask_underwriter` highlights the field, states why that field blocks the quote, offers a jump-to-field button, counts unanswered items in the header, **and** hands the agent the sentence to say. The answer comes back either by typing in the page or by telling the agent, and the agent picks it up on its next `check_submission`.
+
+Every required field carries its own reason in `assets/state.js`, so the page can explain itself even when the agent supplies nothing. The FEIN's, for example: *carriers bind and file the policy on the FEIN, and it is how the experience mod is verified with the rating bureau.*
 
 ---
 
@@ -50,9 +57,9 @@ The whole agent-facing surface is one file: [`assets/webmcp.js`](assets/webmcp.j
 | `list_inbox` | ✓ | Lists the submissions waiting in the queue. |
 | `open_submission` | | Opens one into the workspace, returns the email body and the attachment list. |
 | `read_attachment` | ✓ | **The page parses a PDF and returns its text.** The agent can't do this alone. |
-| `update_submission` | | Writes extracted values onto the record. They appear on screen immediately. |
+| `update_submission` | | Writes extracted values onto the record, optionally credited to the document they came from. They appear on screen immediately. |
 | `check_submission` | ✓ | Runs the underwriting rules. Returns what's missing, what contradicts, what's out of appetite, and the current lane. |
-| `ask_underwriter` | ✓ | Highlights a field and hands a question to the human. Changes no data. |
+| `ask_underwriter` | ✓ | Raises a field to the human: highlights it, explains why it matters, hands the agent the words to say. Changes no data. |
 | `propose_routing` | | Puts a lane and its reasoning on screen. **Routes nothing.** A person clicks. |
 
 Every tool is a thin wrapper over a function the underwriter's own buttons call ([`assets/ui.js`](assets/ui.js)). There is no separate agent code path, so the tools cannot drift away from the interface.
@@ -64,6 +71,7 @@ Every tool is a thin wrapper over a function the underwriter's own buttons call 
 - **Errors are returned, not thrown.** A bad submission id comes back as *"No submission with id X. Call list_inbox for the valid ids."* A model can recover from that. A rejected promise gives it nothing.
 - **The UI updates before the tool returns.** Agents read the screen to decide what's next; returning early makes them act on stale state.
 - **Unknown fields are reported back**, with the valid names, rather than silently dropped.
+- **Settling a contradiction is not exposed as a tool.** The agent can see that one is open and that a person settled it, but there is no `resolve_conflict` for it to call. That is deliberate.
 - **The input schema names every field explicitly** with a one-line hint each, so the model isn't guessing key names — and it asks for nothing about a person. Every field is a business underwriting fact taken from a document.
 - **Tool budgets respected**: names ≤ 30 characters, descriptions ≤ 500, parameter descriptions ≤ 150, outputs ≤ 1,500. Enforced by the test suite.
 - **PDF.js is vendored, not loaded from a CDN**, and it loads lazily — a slow or blocked third party can't stop the tools from registering.
@@ -105,8 +113,8 @@ npm test
 
 `test/shot.mjs` writes screenshots of the desk mid-scenario in both light and dark.
 
-`test/preview.mjs` drives the hosted preview end to end — presses play, answers the question it
-stops on, and checks it resumes to a routing proposal. 28 checks.
+`test/preview.mjs` drives the hosted preview end to end — presses play, checks the contradiction is
+shown with its receipts, settles it, and confirms it resumes to a routing proposal. 38 checks.
 
 ### The hosted preview
 

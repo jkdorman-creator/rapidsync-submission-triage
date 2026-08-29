@@ -12,7 +12,7 @@
 //   * the UI updates before a tool returns
 //   * nothing consequential runs without a human clicking
 // ---------------------------------------------------------------------------
-import { INBOX, LANES, state, evaluate, findSubmission, openSubmission, fieldLabel, FIELD_KEYS } from './state.js';
+import { INBOX, LANES, state, evaluate, findSubmission, openSubmission, fieldLabel, fieldWhy, FIELD_KEYS } from './state.js';
 import {
   openSubmissionById, extractAttachment, setFields, askUnderwriter,
   proposeRoute, logToolCall, setToolStatus,
@@ -38,6 +38,7 @@ const RECORD_PROPERTIES = {
   loss_run_years:    { type: 'number', description: 'How many policy years the attached loss runs actually cover.' },
   loss_run_claims:   { type: 'number', description: 'Number of claims listed on the loss runs.' },
   loss_run_incurred: { type: 'number', description: 'Total incurred across all claims on the loss runs, as a number.' },
+  source_document:   { type: 'string', description: 'Attachment id these values came from, so the record shows which document each fact is based on. Omit for facts taken from the email body.' },
 };
 
 const TOOLS = [
@@ -140,10 +141,17 @@ const TOOLS = [
     async execute(input) {
       if (!openSubmission()) return 'No submission is open. Call open_submission first.';
       const values = input && typeof input === 'object' ? input : {};
-      if (Object.keys(values).length === 0) {
+      if (Object.keys(values).filter(k => k !== 'source_document').length === 0) {
         return 'Nothing sent. Pass at least one field, for example {"named_insured": "Acme Inc."}.';
       }
-      const { applied, rejected } = setFields(values, 'agent');
+      const src = values.source_document ? String(values.source_document).trim() : null;
+      const sub = openSubmission();
+      const doc = src ? sub.attachments.find(a => a.id === src) : null;
+      if (src && !doc) {
+        return `"${src}" is not an attachment on ${sub.id}. Available: ${sub.attachments.map(a => a.id).join(', ')}. Send the values again with the right id, or leave source_document out.`;
+      }
+      delete values.source_document;
+      const { applied, rejected } = setFields(values, doc ? doc.name : 'agent');
       logToolCall('update_submission', applied.length
         ? `Wrote ${applied.length} field${applied.length === 1 ? '' : 's'} — ${applied.slice(0, 3).map(fieldLabel).join(', ')}${applied.length > 3 ? ` and ${applied.length - 3} more` : ''}`
         : 'Nothing written');
@@ -169,7 +177,13 @@ const TOOLS = [
       const r = evaluate();
       const out = [`Current lane: ${r.laneLabel}. ${LANES[r.lane].blurb}`, `Record is ${r.completeness}% captured.`];
       if (r.appetite.length) out.push('APPETITE PROBLEM: ' + r.appetite.map(a => a.message).join(' '));
-      if (r.conflicts.length) out.push('CONTRADICTION: ' + r.conflicts.map(c => c.message).join(' '));
+      if (r.conflicts.length) {
+        out.push('CONTRADICTION: ' + r.conflicts.map(c => c.message).join(' '));
+        out.push('The page is showing the underwriter the exact line from each document and two buttons to pick which one governs. Tell them it is waiting; you cannot settle it yourself.');
+      }
+      for (const res of Object.values(state.resolutions)) {
+        out.push(`SETTLED BY THE UNDERWRITER: ${res.label}.`);
+      }
       if (r.missing.length) out.push('MISSING TO QUOTE: ' + r.missing.map(fieldLabel).join(', ') + '.');
       if (r.notes.length) out.push('LIMITS THE OFFER: ' + r.notes.map(n => n.message).join(' '));
       if (!r.appetite.length && !r.conflicts.length && !r.missing.length && !r.notes.length) {
@@ -186,17 +200,18 @@ const TOOLS = [
     name: 'ask_underwriter',
     title: 'Ask the underwriter for help',
     description:
-      'Highlights one field on screen and puts a question to the human underwriter. Use it when a value is missing from every document, is unreadable, or when two documents disagree and only a person can decide. Returns the question to say out loud. Does not change the record.',
+      'Raises one field to the human underwriter: highlights it, explains why it matters, and puts a question to them. Use when a value is missing from every document, is unreadable, or when documents disagree. Returns the words to say to the user. Changes no data. The page supplies the standard reason a field is needed, so you only pass why if you know something more specific.',
     inputSchema: {
       type: 'object',
       properties: {
         field: { type: 'string', enum: FIELD_KEYS, description: 'Which field on the record the underwriter needs to settle.' },
         question: { type: 'string', description: 'The question in plain language, saying what you found and what you need from them.' },
+        why: { type: 'string', description: 'Optional. Why this value matters here, if you know something the page does not.' },
       },
       required: ['field', 'question'],
     },
     annotations: { readOnlyHint: true, untrustedContentHint: false },
-    async execute({ field, question }) {
+    async execute({ field, question, why }) {
       if (!openSubmission()) return 'No submission is open. Call open_submission first.';
       const key = String(field || '').trim();
       if (!FIELD_KEYS.includes(key)) {
@@ -204,9 +219,15 @@ const TOOLS = [
       }
       const q = String(question || '').trim();
       if (!q) return 'Pass a question. The underwriter needs to know what you are asking for and why.';
-      askUnderwriter(key, q);
-      logToolCall('ask_underwriter', `Asked about ${fieldLabel(key)}`, 'ask');
-      return `Highlighted "${fieldLabel(key)}" on screen and focused it. Now put this to the user and wait for their answer: ${q}`;
+      const reason = (why && String(why).trim()) || fieldWhy(key);
+      askUnderwriter(key, q, reason);
+      logToolCall('ask_underwriter', `Asked for ${fieldLabel(key)}`, 'ask');
+      return [
+        `On screen: "${fieldLabel(key)}" is highlighted, with a Go to the field button and the reason it is needed.`,
+        `Say this to the user: ${q}`,
+        reason ? `If they ask why it matters: ${reason}` : '',
+        'They can type it into the record or tell you. Call check_submission again once they answer.',
+      ].filter(Boolean).join('\n');
     },
   },
 

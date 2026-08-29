@@ -101,10 +101,18 @@ await call('update_submission', {
   years_in_business: 19, effective_date: '10/01/2026', experience_mod: 1.18,
   governing_class: '2802', class_description: 'Carpentry shop - woodworking',
   annual_payroll: 2692000, employee_count: 55,
-  losses_on_app: 'no', loss_run_years: 2, loss_run_claims: 4, loss_run_incurred: 92400,
+  losses_on_app: 'no', source_document: 'ATT-4502-A',
+});
+await call('update_submission', {
+  loss_run_years: 2, loss_run_claims: 4, loss_run_incurred: 92400, source_document: 'ATT-4502-B',
 });
 check('record shows the named insured on screen', (await page.inputValue('#f-named_insured')) === 'Cascade Millwork Inc.');
-check('provenance marks agent-written fields', (await page.textContent('#record')).includes('from agent'));
+check('record credits the document each fact came from',
+  (await page.textContent('#record')).includes('from cascade-application.pdf')
+  && (await page.textContent('#record')).includes('from cascade-loss-run.pdf'));
+
+const badSrc = await call('update_submission', { named_insured: 'X', source_document: 'ATT-NOPE' });
+check('bad source document is rejected with the valid ids', badSrc.includes('ATT-4502-A'));
 
 const junk = await call('update_submission', { totally_made_up: 'x', named_insured: 'Cascade Millwork Inc.' });
 check('unknown field reported back, not silently dropped', junk.includes('totally_made_up') && junk.includes('Valid names'));
@@ -116,7 +124,11 @@ check('lane is Send for Info', c1.includes('Send for Info'));
 check('Send for Info chip is lit', (await page.locator('[data-lane="send_for_info"].lane--active').count()) === 1);
 
 const ask = await call('ask_underwriter', { field: 'fein', question: 'The application left the FEIN blank and it is not on the loss run. What is it?' });
-check('ask_underwriter returns the question to relay', ask.includes('Highlighted') && ask.includes('FEIN'));
+check('ask_underwriter returns the words to say', ask.includes('Say this to the user'));
+check('ask_underwriter supplies the reason without being told', ask.includes('rating bureau'));
+check('question panel says what to do', (await page.textContent('#question')).includes('Enter the fein'));
+check('question panel explains why it matters', (await page.textContent('#question')).includes('cannot be rated'));
+check('question panel offers a jump to the field', (await page.textContent('#question')).includes('Go to FEIN'));
 check('asked field is highlighted on screen', (await page.locator('.field--asked[data-field="fein"]').count()) === 1);
 check('question panel is visible', !(await page.locator('#question').isHidden()));
 
@@ -128,11 +140,22 @@ await page.fill('#f-fein', '38-2841190');
 await page.dispatchEvent('#f-fein', 'change');
 check('answering clears the highlight', (await page.locator('.field--asked').count()) === 0);
 
-// the human settles the contradiction in favour of the loss run
-await page.selectOption('#f-losses_on_app', 'yes');
-await page.dispatchEvent('#f-losses_on_app', 'change');
+// the contradiction card shows the actual line from each document
+const conflictText = await page.textContent('.conflict');
+check('conflict card quotes the application', conflictText.includes('cascade-application.pdf'));
+check('conflict card quotes the loss run', conflictText.includes('cascade-loss-run.pdf'));
+check('conflict card offers both readings', (await page.locator('.btn--choice').count()) === 2);
+check('conflict card offers a side-by-side check', conflictText.includes('side by side'));
+check('topbar flags that something needs a person', !(await page.locator('#needs-you').isHidden()));
+
+// the human settles it with one click, in favour of the loss run
+await page.click('.btn--choice');
+await page.waitForTimeout(200);
 const c2 = await call('check_submission');
 check('contradiction clears once a person settles it', !c2.includes('CONTRADICTION'));
+check('agent is told who settled it and how', c2.includes('SETTLED BY THE UNDERWRITER'));
+check('the application answer is left as written', (await page.inputValue('#f-losses_on_app')) === 'no');
+check('settled note stays on screen', (await page.textContent('#findings')).includes('settled by you'));
 check('short loss history now drives Indication', c2.includes('Indication') && c2.includes('LIMITS THE OFFER'));
 
 const prop = await call('propose_routing', { lane: 'indication', rationale: 'Loss runs cover only two years, so we can indicate but not firm quote.' });

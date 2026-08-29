@@ -71,6 +71,7 @@ ui_js = ui_js.replace(body.group(0), (
     "  await new Promise(r => setTimeout(r, 260));   // the real parse is not instant either\n"
     "  const text = EXTRACTED[attachmentId];\n"
     "  if (!text) throw new Error('no text captured for ' + attachmentId);\n"
+    "  state.documents[attachmentId] = { name: att.name, kind: att.kind, text };\n"
     "  return text;\n"
     "}\n"
 ))
@@ -202,10 +203,16 @@ async function play() {
     named_insured: 'Cascade Millwork Inc.', entity_type: 'Corporation', state: 'MI',
     years_in_business: 19, effective_date: '10/01/2026', experience_mod: 1.18,
     governing_class: '2802', class_description: 'Carpentry shop - woodworking',
-    annual_payroll: 2692000, employee_count: 55,
-    losses_on_app: 'no', loss_run_years: 2, loss_run_claims: 4, loss_run_incurred: 92400,
+    annual_payroll: 2692000, employee_count: 55, losses_on_app: 'no',
+    source_document: 'ATT-4502-A',
   });
-  await wait(1100);
+  await wait(900);
+  say('agent', 'And the loss run figures, kept separate so you can see which document each fact came from.');
+  await run('update_submission', {
+    loss_run_years: 2, loss_run_claims: 4, loss_run_incurred: 92400,
+    source_document: 'ATT-4502-B',
+  });
+  await wait(1000);
 
   t = say('agent', 'Running your underwriting rules…', true);
   await run('check_submission'); await wait(800);
@@ -213,15 +220,15 @@ async function play() {
   say('agent', 'Two problems. The application says no prior losses, but the loss run shows four claims and $92,400 incurred, including a finger amputation. And the FEIN was left blank.');
   await wait(1400);
 
-  say('agent', 'I can read both documents but I cannot tell you which one is right. That is your call.');
-  await wait(1000);
+  say('agent', 'I can read both documents but I cannot tell you which one governs. That is your call, so I have put the exact line from each one on screen with the two buttons that settle it.');
+  await wait(1400);
 
   await run('ask_underwriter', {
     field: 'fein',
-    question: 'The application left the FEIN blank and the loss run does not carry it either. Can you pull it from the prior policy? And the loss disclosure on the application contradicts the loss run — which one should I trust?',
+    question: 'The application left the FEIN blank and the loss run does not carry it either — can you pull it from the prior policy?',
   });
   document.getElementById('question').classList.add('waiting');
-  say('agent', 'Over to you — I have highlighted the FEIN field on the record. Fill it in, and set the loss disclosure to match whichever document you trust.');
+  say('agent', 'Two things need you: enter the FEIN, and pick which document governs on the losses. Both are marked on the right.');
   playBtn.disabled = false;
   playBtn.textContent = 'Continue once you have answered';
   playBtn.onclick = resume;
@@ -232,24 +239,25 @@ async function resume() {
   if (running) return;
   const r = evaluate();
   if (isBlank(state.record.fein)) {
-    say('agent', 'Still waiting on the FEIN — it is the highlighted field on the record.');
+    say('agent', 'Still waiting on the FEIN. It is the highlighted field on the record — the panel says why it blocks rating.');
     return;
   }
   if (r.conflicts.length) {
-    say('agent', 'The loss disclosure still contradicts the loss run. Set "Losses disclosed on application" to whichever document you trust.');
+    say('agent', 'Still waiting on the losses. Read the two quotes on the right and press whichever button matches — the loss run governs, or the application governs.');
     return;
   }
   running = true;
   playBtn.disabled = true;
   playBtn.textContent = 'Working…';
   document.getElementById('question').classList.remove('waiting');
-  say('you', 'Done — FEIN is in, and the loss run is the one to trust.');
+  const settled = Object.values(state.resolutions)[0];
+  say('you', 'Done — FEIN is in' + (settled ? `, and ${settled.label.toLowerCase()}.` : '.'));
   await wait(700);
 
   let t = say('agent', 'Thanks. Re-running the rules…', true);
   await run('check_submission'); await wait(800);
   t.remove();
-  say('agent', 'That clears the contradiction. What is left is the loss runs only cover two years, and you need three to firm up a quote — so this is an indication, not a quote.');
+  say('agent', 'That settles it, and both readings stay on the record so the file shows what each document said. What is left is the loss runs only cover two years, and you need three to firm up a quote — so this is an indication.');
   await wait(1300);
 
   await run('propose_routing', {
