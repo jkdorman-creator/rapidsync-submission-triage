@@ -48,10 +48,17 @@ for (const scheme of ['light', 'dark']) {
   await page.waitForTimeout(150);
   check(`[${scheme}] question panel explains why the FEIN matters`,
     (await page.textContent('#question')).includes('rating bureau'));
+  check(`[${scheme}] the FEIN field itself carries the ask`,
+    (await page.textContent('#record')).includes('Type it in the box above'));
+  check(`[${scheme}] action bar names both jobs`,
+    (await page.textContent('#actionbar')).includes('Enter the FEIN')
+    && (await page.textContent('#actionbar')).includes('Decide which document is right'));
   check(`[${scheme}] lane is Send for Info`, (await page.locator('[data-lane="send_for_info"].lane--active').count()) === 1);
   check(`[${scheme}] button invites you to continue`, (await page.textContent('#play')).includes('Continue'));
 
   if (scheme === 'light') {
+    await page.evaluate(() => document.querySelector('[data-field="fein"]').scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(400);
     await page.screenshot({ path: 'test/screens/preview-handoff.png' });
   }
 
@@ -65,10 +72,14 @@ for (const scheme of ['light', 'dark']) {
   await page.click('#play');
   await page.waitForTimeout(400);
   check(`[${scheme}] still refuses while the contradiction stands`, (await page.textContent('#transcript')).includes('Still waiting on the losses'));
+  // "Governing class code" is real WC terminology and stays. What must not
+  // appear is the stiff phrasing nobody says out loud.
+  check(`[${scheme}] no document "governs" phrasing`,
+    !/(document|loss run|application)s?\s+governs?/i.test(await page.textContent('body')));
 
   await page.click('.btn--choice');
   await page.waitForTimeout(200);
-  check(`[${scheme}] settling it leaves a trail`, (await page.textContent('#findings')).includes('settled by you'));
+  check(`[${scheme}] settling it leaves a trail`, (await page.textContent('#findings')).includes('You settled this'));
   await page.click('#play');
   await page.waitForSelector('#routing .btn--primary', { timeout: 25000 });
   check(`[${scheme}] resumes to a routing proposal`, (await page.textContent('#routing')).includes('Indication'));

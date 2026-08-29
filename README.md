@@ -40,9 +40,9 @@ Working together: the agent reads both documents, and credits each fact to the d
 > `cascade-application.pdf` — *Losses in past 3 years? NO - no claims reported*
 > `cascade-loss-run.pdf` — *Total Incurred (period shown) $92,400 · TOTAL - 4 claims*
 
-and two buttons: **the loss run governs** or **the application governs**. One click settles it, and both readings stay on the record so the disagreement never disappears quietly. The file moves from *Send for Info* to *Indication*, for a reason both parties can see. If quoting the lines isn't enough, "check both documents side by side" opens the full extracted text of each.
+and two buttons: **Use the loss run** or **Use the application**, each saying what picking it means. One click settles it, and both answers stay on the file so the disagreement never disappears quietly. The file moves from *Send for Info* to *Indication*, for a reason both parties can see. If quoting the lines isn't enough, "check both documents side by side" opens the full extracted text of each.
 
-**WebMCP has no built-in way for a tool to ask the user something.** There is no elicitation API in the spec; `requestUserInteraction()` is discussed in the working group but not specified, and Chrome's own docs describe it as if it exists. So a tool cannot hold a conversation — it can only change the page and return words to the agent. Both of those are used here: `ask_underwriter` highlights the field, states why that field blocks the quote, offers a jump-to-field button, counts unanswered items in the header, **and** hands the agent the sentence to say. The answer comes back either by typing in the page or by telling the agent, and the agent picks it up on its next `check_submission`.
+**WebMCP has no built-in way for a tool to ask the user something.** There is no elicitation API in the spec; `requestUserInteraction()` is discussed in the working group but not specified, and Chrome's own docs describe it as if it exists. So a tool cannot hold a conversation — it can only change the page and return words to the agent. Both of those are used here: `ask_underwriter` highlights the field, writes the ask and the reason directly beside that field, names the job in a sticky bar that follows you down the page, **and** hands the agent the sentence to say. The answer comes back either by typing in the page or by telling the agent, and the agent picks it up on its next `check_submission`.
 
 Every required field carries its own reason in `assets/state.js`, so the page can explain itself even when the agent supplies nothing. The FEIN's, for example: *carriers bind and file the policy on the FEIN, and it is how the experience mod is verified with the rating bureau.*
 
@@ -80,7 +80,7 @@ Every tool is a thin wrapper over a function the underwriter's own buttons call 
 
 Deterministic, in [`assets/state.js`](assets/state.js), and shown on screen so the underwriter can see what fired:
 
-- **Likely Decline** — governing class is on the prohibited list, experience mod above 1.35, or incurred losses above $150,000.
+- **Likely Decline** — the governing class code is on the prohibited list, the experience mod is above 1.35, or incurred losses are above $150,000.
 - **Send for Info** — two documents contradict each other, or something required to quote is missing.
 - **Indication** — complete and in appetite, but the loss runs cover fewer than three years, so a ballpark is all that's honest.
 - **Quote Now** — clean.

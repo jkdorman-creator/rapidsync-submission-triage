@@ -126,7 +126,12 @@ check('Send for Info chip is lit', (await page.locator('[data-lane="send_for_inf
 const ask = await call('ask_underwriter', { field: 'fein', question: 'The application left the FEIN blank and it is not on the loss run. What is it?' });
 check('ask_underwriter returns the words to say', ask.includes('Say this to the user'));
 check('ask_underwriter supplies the reason without being told', ask.includes('rating bureau'));
-check('question panel says what to do', (await page.textContent('#question')).includes('Enter the fein'));
+check('question panel says what to do', (await page.textContent('#question')).includes('Enter the FEIN'));
+check('the field itself says what is wanted', (await page.textContent('[data-field="fein"], .group')).includes('Type it in the box above'));
+check('the field placeholder is an instruction', (await page.getAttribute('#f-fein', 'placeholder')) === 'Type the FEIN here');
+check('action bar names the jobs, not a count',
+  (await page.textContent('#actionbar')).includes('Enter the FEIN')
+  && (await page.textContent('#actionbar')).includes('Decide which document is right'));
 check('question panel explains why it matters', (await page.textContent('#question')).includes('cannot be rated'));
 check('question panel offers a jump to the field', (await page.textContent('#question')).includes('Go to FEIN'));
 check('asked field is highlighted on screen', (await page.locator('.field--asked[data-field="fein"]').count()) === 1);
@@ -146,16 +151,18 @@ check('conflict card quotes the application', conflictText.includes('cascade-app
 check('conflict card quotes the loss run', conflictText.includes('cascade-loss-run.pdf'));
 check('conflict card offers both readings', (await page.locator('.btn--choice').count()) === 2);
 check('conflict card offers a side-by-side check', conflictText.includes('side by side'));
-check('topbar flags that something needs a person', !(await page.locator('#needs-you').isHidden()));
+check('conflict wording is plain', conflictText.includes('Use the loss run') && !conflictText.includes('governs'));
+check('action bar is visible while something is open', !(await page.locator('#actionbar').isHidden()));
+check('header is sticky', (await page.evaluate(() => getComputedStyle(document.querySelector('.stickytop')).position)) === 'sticky');
 
 // the human settles it with one click, in favour of the loss run
 await page.click('.btn--choice');
 await page.waitForTimeout(200);
 const c2 = await call('check_submission');
 check('contradiction clears once a person settles it', !c2.includes('CONTRADICTION'));
-check('agent is told who settled it and how', c2.includes('SETTLED BY THE UNDERWRITER'));
+check('agent is told what the person decided', c2.includes('THE UNDERWRITER DECIDED: You went with the loss run'));
 check('the application answer is left as written', (await page.inputValue('#f-losses_on_app')) === 'no');
-check('settled note stays on screen', (await page.textContent('#findings')).includes('settled by you'));
+check('settled note stays on screen', (await page.textContent('#findings')).includes('You settled this'));
 check('short loss history now drives Indication', c2.includes('Indication') && c2.includes('LIMITS THE OFFER'));
 
 const prop = await call('propose_routing', { lane: 'indication', rationale: 'Loss runs cover only two years, so we can indicate but not firm quote.' });

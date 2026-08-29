@@ -28,7 +28,7 @@ export const FIELDS = [
     why: 'Sanity-checks the payroll and drives which carriers will look at it.' },
 
   { key: 'losses_on_app',      label: 'Losses disclosed on application', group: 'Loss history', required: true, type: 'yesno',
-    why: 'What the application itself claims about prior losses. Kept as written even when a loss run disagrees, so the disagreement stays visible.' },
+    why: 'What the application itself says about past losses. We leave it as written even when a loss run disagrees, so the disagreement stays on the file.' },
   { key: 'loss_run_years',     label: 'Years of loss runs provided',     group: 'Loss history', required: true, type: 'number',
     why: 'Three years is the minimum to firm up a quote. Fewer means an indication at best.' },
   { key: 'loss_run_claims',    label: 'Claims shown on loss runs',       group: 'Loss history', required: false, type: 'number' },
@@ -57,7 +57,7 @@ export const MAX_INCURRED = 150000;
 export const MIN_LOSS_RUN_YEARS = 3;
 
 export const LANES = {
-  quote_now:     { label: 'Quote Now',     blurb: 'In appetite, complete, and clean. Send to rating.' },
+  quote_now:     { label: 'Quote Now',     blurb: 'Everything checks out. Send it to rating.' },
   indication:    { label: 'Indication',    blurb: 'Enough to price a ballpark, not enough to bind.' },
   send_for_info: { label: 'Send for Info', blurb: 'Go back to the producer before anything else.' },
   likely_decline:{ label: 'Likely Decline',blurb: 'Outside appetite. Decline politely and fast.' },
@@ -134,14 +134,16 @@ export function evaluate(record = state.record) {
       && !state.resolutions.LOSS_DISCLOSURE_MISMATCH) {
     conflicts.push({
       code: 'LOSS_DISCLOSURE_MISMATCH',
-      message: `The application reports no losses. The loss run shows ${claims} claim${claims === 1 ? '' : 's'}${incurred !== null ? ` and $${incurred.toLocaleString()} incurred` : ''}. Only a person can say which document governs.`,
+      message: `The application says there were no losses. The loss run shows ${claims} claim${claims === 1 ? '' : 's'}${incurred !== null ? `, $${incurred.toLocaleString()} paid and reserved` : ''}. They cannot both be right. Pick the one to go with.`,
       fields: ['losses_on_app', 'loss_run_claims'],
       evidence: evidenceForLossMismatch(),
       choices: [
-        { id: 'loss_run',    label: 'The loss run governs',
-          detail: 'The application answer was wrong or stale. Price the losses in.' },
-        { id: 'application', label: 'The application governs',
-          detail: 'The loss run belongs to a different entity or period. Set the loss data aside.' },
+        { id: 'loss_run', label: 'Use the loss run',
+          detail: 'The application answer is wrong or out of date. Price the claims in.',
+          settled: 'You went with the loss run' },
+        { id: 'application', label: 'Use the application',
+          detail: 'The loss run is for a different company or a different period. Leave the claims out.',
+          settled: 'You went with the application' },
       ],
     });
   }
@@ -206,8 +208,8 @@ function evidenceForLossMismatch() {
   return out;
 }
 
-export function resolveConflict(code, choiceId, label) {
-  state.resolutions[code] = { trusted: choiceId, label, at: new Date(), by: 'underwriter' };
+export function resolveConflict(code, choiceId, label, settled) {
+  state.resolutions[code] = { trusted: choiceId, label, settled: settled || label, at: new Date(), by: 'underwriter' };
   return state.resolutions[code];
 }
 

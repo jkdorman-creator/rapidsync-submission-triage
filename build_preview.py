@@ -220,7 +220,7 @@ async function play() {
   say('agent', 'Two problems. The application says no prior losses, but the loss run shows four claims and $92,400 incurred, including a finger amputation. And the FEIN was left blank.');
   await wait(1400);
 
-  say('agent', 'I can read both documents but I cannot tell you which one governs. That is your call, so I have put the exact line from each one on screen with the two buttons that settle it.');
+  say('agent', 'I can read both documents, but I cannot tell you which one is right. That is your call. I have put the exact line from each one on screen with the two buttons that settle it.');
   await wait(1400);
 
   await run('ask_underwriter', {
@@ -228,7 +228,7 @@ async function play() {
     question: 'The application left the FEIN blank and the loss run does not carry it either — can you pull it from the prior policy?',
   });
   document.getElementById('question').classList.add('waiting');
-  say('agent', 'Two things need you: enter the FEIN, and pick which document governs on the losses. Both are marked on the right.');
+  say('agent', 'Two things need you: enter the FEIN, and say which document to go with on the losses. Both are listed in the bar at the top.');
   playBtn.disabled = false;
   playBtn.textContent = 'Continue once you have answered';
   playBtn.onclick = resume;
@@ -243,7 +243,7 @@ async function resume() {
     return;
   }
   if (r.conflicts.length) {
-    say('agent', 'Still waiting on the losses. Read the two quotes on the right and press whichever button matches — the loss run governs, or the application governs.');
+    say('agent', 'Still waiting on the losses. Read the two quotes and press either Use the loss run or Use the application.');
     return;
   }
   running = true;
@@ -251,13 +251,13 @@ async function resume() {
   playBtn.textContent = 'Working…';
   document.getElementById('question').classList.remove('waiting');
   const settled = Object.values(state.resolutions)[0];
-  say('you', 'Done — FEIN is in' + (settled ? `, and ${settled.label.toLowerCase()}.` : '.'));
+  say('you', 'Done — FEIN is in' + (settled ? `, and I went with the ${settled.trusted === 'loss_run' ? 'loss run' : 'application'}.` : '.'));
   await wait(700);
 
   let t = say('agent', 'Thanks. Re-running the rules…', true);
   await run('check_submission'); await wait(800);
   t.remove();
-  say('agent', 'That settles it, and both readings stay on the record so the file shows what each document said. What is left is the loss runs only cover two years, and you need three to firm up a quote — so this is an indication.');
+  say('agent', 'That settles it, and both answers stay on the file so it is clear what each document said. What is left is that the loss runs only cover two years, and you need three to firm up a quote. So this is an indication.');
   await wait(1300);
 
   await run('propose_routing', {

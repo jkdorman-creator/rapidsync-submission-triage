@@ -33,6 +33,7 @@ h2, h3 { margin: 0; font-weight: 600; }
 code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
 
 /* topbar ------------------------------------------------------------- */
+.stickytop { position: sticky; top: 0; z-index: 40; }
 .topbar {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 14px 22px; background: var(--panel); border-bottom: 1px solid var(--line);
@@ -123,6 +124,7 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
   display: grid; grid-template-columns: 200px 1fr auto; gap: 10px;
   align-items: center; padding: 5px 8px; margin: 0 -8px; border-radius: 7px;
 }
+.group { display: flex; flex-direction: column; }
 @media (max-width: 620px) { .field { grid-template-columns: 1fr; gap: 4px; } }
 .field__label { color: var(--muted); font-size: 12.5px; }
 .req { color: var(--stop); margin-left: 3px; }
@@ -216,13 +218,39 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
   color: var(--muted); font-size: 12px; background: var(--panel);
 }
 
-/* ---- something needs the underwriter ---------------------------------- */
-.pill--needs {
-  cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 550;
-  background: color-mix(in srgb, var(--ask) 14%, var(--panel));
-  border-color: var(--ask); color: var(--ask);
+/* ---- the action bar that follows you down the page -------------------- */
+.actionbar {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 9px 22px;
+  background: color-mix(in srgb, var(--ask) 11%, var(--panel));
+  border-bottom: 1px solid color-mix(in srgb, var(--ask) 35%, var(--line));
 }
-.pill--needs:hover { background: color-mix(in srgb, var(--ask) 22%, var(--panel)); }
+.actionbar__label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 650; color: var(--ask); white-space: nowrap;
+}
+.actionchip {
+  font: inherit; font-size: 12.5px; font-weight: 550; cursor: pointer;
+  padding: 5px 12px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ask) 45%, transparent);
+  background: var(--panel); color: var(--ask);
+}
+.actionchip:hover { background: var(--ask); color: #fff; border-color: transparent; }
+.actionchip:focus-visible { outline: 2px solid var(--ask); outline-offset: 2px; }
+.actionbar--clear {
+  background: var(--panel); border-bottom-color: var(--line);
+}
+.actionbar--clear .actionbar__label { color: var(--muted); }
+
+/* ---- the note that sits with the field being asked about -------------- */
+.fieldnote {
+  margin: 2px 0 8px; border-left: 3px solid var(--ask); padding: 9px 0 9px 11px;
+  background: color-mix(in srgb, var(--ask) 7%, transparent);
+  border-radius: 0 7px 7px 0;
+}
+.fieldnote__head { font-size: 12.5px; font-weight: 600; color: var(--ask); margin-bottom: 5px; }
+.fieldnote__ask { margin: 0 0 6px; font-size: 12.5px; line-height: 1.5; }
+.fieldnote__why { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 
 /* ---- a contradiction gets its own card, with the receipts -------------- */
 .conflict {

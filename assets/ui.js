@@ -164,9 +164,9 @@ export function compareDocuments() {
   return true;
 }
 
-export function resolveConflictByHand(code, choiceId, label) {
-  resolveConflict(code, choiceId, label);
-  logToolCall('(underwriter)', `Settled the contradiction — ${label}`, 'human');
+export function resolveConflictByHand(code, choiceId, label, settled) {
+  resolveConflict(code, choiceId, label, settled);
+  logToolCall('(underwriter)', `${settled || label}`, 'human');
   state.proposal = null;
   state.decision = null;
   render();
@@ -235,11 +235,7 @@ function flash(keys) {
 export function askUnderwriter(field, question, why) {
   state.pendingQuestion = { field, question, why: why || fieldWhy(field) };
   render();
-  const input = document.querySelector(`[data-field="${field}"] input, [data-field="${field}"] select`);
-  if (input) {
-    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    input.focus();
-  }
+  focusField(field);
   return true;
 }
 
@@ -292,6 +288,7 @@ function renderRecord() {
       if (f.required) lab.append(el('span', 'req', '*'));
       wrap.append(lab);
 
+      const asked = pending && pending.field === f.key;
       let input;
       if (f.type === 'yesno') {
         input = el('select', 'field__input');
@@ -304,7 +301,8 @@ function renderRecord() {
         input.type = 'text';
         const raw = state.record[f.key];
         input.value = isBlank(raw) ? '' : (f.type === 'money' ? asMoney(raw) : raw);
-        input.placeholder = f.required ? 'required' : 'optional';
+        input.placeholder = asked ? `Type the ${f.label} here`
+                                  : (f.required ? 'required' : 'optional');
       }
       input.id = `f-${f.key}`;
       input.addEventListener('change', () => {
@@ -321,6 +319,16 @@ function renderRecord() {
       const src = state.provenance[f.key];
       if (src) wrap.append(el('span', 'field__src', src === 'underwriter' ? 'entered by you' : `from ${src}`));
       box.append(wrap);
+
+      // When the agent has asked for this one, say so at the field, not in a
+      // panel somewhere else on the page.
+      if (asked) {
+        const note = el('div', 'fieldnote');
+        note.append(el('div', 'fieldnote__head', 'Your agent needs this. Type it in the box above.'));
+        note.append(el('p', 'fieldnote__ask', pending.question));
+        if (pending.why) note.append(el('p', 'fieldnote__why', pending.why));
+        box.append(note);
+      }
     }
     pane.append(box);
   }
@@ -354,7 +362,7 @@ function renderRules() {
   // says, and give the underwriter the two buttons that settle it.
   for (const c of r.conflicts) {
     const box = el('div', 'conflict');
-    box.append(el('div', 'conflict__title', 'Contradiction — only you can settle this'));
+    box.append(el('div', 'conflict__title', 'These two documents disagree'));
     box.append(el('p', 'conflict__message', c.message));
 
     if (c.evidence && c.evidence.length) {
@@ -377,7 +385,7 @@ function renderRules() {
       btn.type = 'button';
       btn.append(el('span', 'btn__label', choice.label));
       btn.append(el('span', 'btn__detail', choice.detail));
-      btn.addEventListener('click', () => resolveConflictByHand(c.code, choice.id, choice.label));
+      btn.addEventListener('click', () => resolveConflictByHand(c.code, choice.id, choice.label, choice.settled));
       actions.append(btn);
     }
     box.append(actions);
@@ -394,9 +402,9 @@ function renderRules() {
   // Once settled, say so and leave the trail.
   for (const [code, res] of Object.entries(state.resolutions)) {
     const settled = el('div', 'finding finding--settled');
-    settled.append(el('div', 'finding__title', 'Contradiction settled by you'));
+    settled.append(el('div', 'finding__title', 'You settled this'));
     const ul = el('ul');
-    ul.append(el('li', null, `${res.label}. Both readings stay on the record.`));
+    ul.append(el('li', null, `${res.settled}. Both answers stay on the file, so it is clear what each document said.`));
     settled.append(ul);
     findings.append(settled);
   }
@@ -413,8 +421,8 @@ function renderRules() {
   if (state.pendingQuestion) {
     const q = state.pendingQuestion;
     qbox.hidden = false;
-    qbox.append(el('div', 'question__label', 'Action needed from you'));
-    qbox.append(el('div', 'question__do', `Enter the ${fieldLabel(q.field).toLowerCase()}`));
+    qbox.append(el('div', 'question__label', 'Your turn'));
+    qbox.append(el('div', 'question__do', `Enter the ${fieldLabel(q.field)}`));
     qbox.append(el('p', 'question__text', q.question));
     if (q.why) {
       const why = el('div', 'question__why');
@@ -425,17 +433,14 @@ function renderRules() {
     const actions = el('div', 'question__actions');
     const go = el('button', 'btn btn--primary', `Go to ${fieldLabel(q.field)}`);
     go.type = 'button';
-    go.addEventListener('click', () => {
-      const input = document.querySelector(`[data-field="${q.field}"] input, [data-field="${q.field}"] select`);
-      if (input) { input.scrollIntoView({ block: 'center', behavior: 'smooth' }); input.focus(); }
-    });
+    go.addEventListener('click', () => focusField(q.field));
     const dismiss = el('button', 'btn btn--ghost', 'Dismiss');
     dismiss.type = 'button';
     dismiss.addEventListener('click', clearQuestion);
     actions.append(go, dismiss);
     qbox.append(actions);
     qbox.append(el('p', 'question__pickup',
-      'Type it into the record and your agent picks it up the next time it checks. You can also just tell the agent.'));
+      'Type it into the record, or just tell your agent. Either way it picks the answer up on its next check.'));
   } else {
     qbox.hidden = true;
   }
@@ -470,21 +475,73 @@ function renderRules() {
 }
 
 // --- Top-level render -------------------------------------------------------
-function renderAlert() {
+// Stays on screen while you scroll, and names what is actually waiting rather
+// than counting it. Each chip takes you to the thing.
+function renderActionBar() {
+  const bar = $('#actionbar');
+  bar.innerHTML = '';
+  if (!state.openSubmissionId) { bar.hidden = true; return; }
+
   const r = evaluate();
-  const needs = (state.pendingQuestion ? 1 : 0) + r.conflicts.length;
-  const pill = $('#needs-you');
-  if (!state.openSubmissionId || needs === 0) { pill.hidden = true; return; }
-  pill.hidden = false;
-  pill.textContent = needs === 1 ? '1 thing needs you' : `${needs} things need you`;
-  pill.onclick = () => {
-    const target = state.pendingQuestion ? $('#question') : $('#findings');
-    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  };
+  const jobs = [];
+
+  for (const c of r.conflicts) {
+    jobs.push({
+      text: 'Decide which document is right',
+      go: () => $('#findings').scrollIntoView({ block: 'center', behavior: 'smooth' }),
+    });
+  }
+  if (state.pendingQuestion) {
+    jobs.push({
+      text: `Enter the ${fieldLabel(state.pendingQuestion.field)}`,
+      go: () => focusField(state.pendingQuestion.field),
+    });
+  }
+  for (const key of r.missing) {
+    if (state.pendingQuestion && state.pendingQuestion.field === key) continue;
+    jobs.push({ text: `Enter the ${fieldLabel(key).toLowerCase()}`, go: () => focusField(key) });
+  }
+  if (r.appetite.length) {
+    jobs.push({
+      text: 'Decline it, or override the appetite rule',
+      go: () => $('#findings').scrollIntoView({ block: 'center', behavior: 'smooth' }),
+    });
+  }
+  if (!jobs.length && state.proposal && !state.decision) {
+    jobs.push({
+      text: 'Approve or reject the routing',
+      go: () => $('#routing').scrollIntoView({ block: 'center', behavior: 'smooth' }),
+    });
+  }
+
+  if (!jobs.length) {
+    bar.hidden = false;
+    bar.className = 'actionbar actionbar--clear';
+    bar.append(el('span', 'actionbar__label', 'Nothing waiting on you'));
+    return;
+  }
+
+  bar.hidden = false;
+  bar.className = 'actionbar';
+  bar.append(el('span', 'actionbar__label',
+    jobs.length === 1 ? 'Your turn — 1 thing' : `Your turn — ${jobs.length} things`));
+  for (const job of jobs.slice(0, 4)) {
+    const chip = el('button', 'actionchip', job.text);
+    chip.type = 'button';
+    chip.addEventListener('click', job.go);
+    bar.append(chip);
+  }
+}
+
+function focusField(key) {
+  const input = document.querySelector(`[data-field="${key}"] input, [data-field="${key}"] select`);
+  if (!input) return;
+  input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  input.focus();
 }
 
 export function render() {
-  renderAlert();
+  renderActionBar();
   renderInbox();
   renderEmail();
   renderRecord();

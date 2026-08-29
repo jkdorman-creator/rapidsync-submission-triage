@@ -179,10 +179,10 @@ const TOOLS = [
       if (r.appetite.length) out.push('APPETITE PROBLEM: ' + r.appetite.map(a => a.message).join(' '));
       if (r.conflicts.length) {
         out.push('CONTRADICTION: ' + r.conflicts.map(c => c.message).join(' '));
-        out.push('The page is showing the underwriter the exact line from each document and two buttons to pick which one governs. Tell them it is waiting; you cannot settle it yourself.');
+        out.push('The page is showing the underwriter the exact line from each document, and two buttons to pick which one to go with. Tell them it is waiting. You cannot pick for them.');
       }
       for (const res of Object.values(state.resolutions)) {
-        out.push(`SETTLED BY THE UNDERWRITER: ${res.label}.`);
+        out.push(`THE UNDERWRITER DECIDED: ${res.settled}.`);
       }
       if (r.missing.length) out.push('MISSING TO QUOTE: ' + r.missing.map(fieldLabel).join(', ') + '.');
       if (r.notes.length) out.push('LIMITS THE OFFER: ' + r.notes.map(n => n.message).join(' '));
