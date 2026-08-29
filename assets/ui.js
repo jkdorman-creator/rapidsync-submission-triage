@@ -7,6 +7,7 @@ import {
   FIELDS, FIELD_KEYS, INBOX, LANES, state, evaluate, findSubmission,
   openSubmission, resetRecord, fieldLabel, fieldWhy, isBlank, resolveConflict,
   DESK_USER, AGENT_LIMITS, fieldNeeded,
+  MAX_EXPERIENCE_MOD, MAX_INCURRED, MIN_LOSS_RUN_YEARS,
 } from './state.js';
 
 // Money reads better with separators. State keeps whatever was written; only
@@ -139,7 +140,15 @@ function renderEmail() {
   head.append(el('div', 'email__subject', sub.subject));
   head.append(el('div', 'email__from', `${sub.from} · received ${sub.received}`));
   pane.append(head);
-  pane.append(el('pre', 'email__body', sub.body));
+  const body = el('pre', 'email__body email__body--clipped', sub.body);
+  pane.append(body);
+  const toggle = el('button', 'email__more', 'Show the whole email');
+  toggle.type = 'button';
+  toggle.addEventListener('click', () => {
+    const clipped = body.classList.toggle('email__body--clipped');
+    toggle.textContent = clipped ? 'Show the whole email' : 'Show less';
+  });
+  pane.append(toggle);
 
   const atts = el('div', 'atts');
   for (const a of sub.attachments) {
@@ -340,6 +349,59 @@ function renderReply() {
   actions.append(send, edit);
   box.append(actions);
   box.append(el('p', 'reply__note', 'Your agent wrote this. It cannot send it.'));
+}
+
+// --- The risk, at a glance --------------------------------------------------
+// An underwriter's first question is "what am I looking at". Seventeen text
+// inputs do not answer it. These six numbers do, and watching them land while
+// the agent reads is the clearest signal that anything is happening.
+const money0 = v => {
+  const n = Number(String(v).replace(/[$,\s]/g, ''));
+  return Number.isFinite(n) ? '$' + n.toLocaleString() : String(v);
+};
+
+function renderRisk() {
+  const box = $('#risk');
+  box.innerHTML = '';
+  const r = state.openSubmissionId ? evaluate() : null;
+  const rec = state.record;
+  const has = k => !isBlank(rec[k]);
+
+  const head = el('div', 'risk__head');
+  const name = el('div', 'risk__name', has('named_insured') ? rec.named_insured : 'No submission open');
+  if (!has('named_insured')) name.classList.add('risk__name--empty');
+  head.append(name);
+  if (r) {
+    const chip = el('span', `risk__lane risk__lane--${r.lane}`, r.laneLabel);
+    head.append(chip);
+  }
+  box.append(head);
+
+  const sub = el('div', 'risk__sub');
+  sub.textContent = has('governing_class')
+    ? `Class ${rec.governing_class}${has('class_description') ? ' · ' + rec.class_description : ''}`
+      + `${has('state') ? ' · ' + rec.state : ''}`
+    : 'Class and operations not read yet';
+  box.append(sub);
+
+  const stats = el('div', 'risk__stats');
+  const stat = (label, value, mods = '') => {
+    const cell = el('div', 'stat' + mods);
+    cell.append(el('div', 'stat__v', value));
+    cell.append(el('div', 'stat__l', label));
+    stats.append(cell);
+  };
+  stat('Annual payroll', has('annual_payroll') ? money0(rec.annual_payroll) : '—');
+  stat('Employees', has('employee_count') ? rec.employee_count : '—');
+  const mod = Number(rec.experience_mod);
+  stat('Experience mod', has('experience_mod') ? Number(mod).toFixed(2) : '—',
+    has('experience_mod') && mod > MAX_EXPERIENCE_MOD ? ' stat--bad' : '');
+  stat('Incurred losses', has('loss_run_incurred') ? money0(rec.loss_run_incurred) : '—',
+    has('loss_run_incurred') && Number(String(rec.loss_run_incurred).replace(/[$,]/g, '')) > MAX_INCURRED ? ' stat--bad' : '');
+  stat('Loss run years', has('loss_run_years') ? `${rec.loss_run_years} of ${MIN_LOSS_RUN_YEARS}` : '—',
+    has('loss_run_years') && Number(rec.loss_run_years) < MIN_LOSS_RUN_YEARS ? ' stat--soft' : '');
+  stat('Effective', has('effective_date') ? rec.effective_date : '—');
+  box.append(stats);
 }
 
 // --- Record form ------------------------------------------------------------
@@ -648,6 +710,7 @@ export function render() {
   renderActionBar();
   renderInbox();
   renderEmail();
+  renderRisk();
   renderRecord();
   renderRules();
   renderReply();

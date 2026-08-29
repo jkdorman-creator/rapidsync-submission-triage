@@ -32,6 +32,7 @@ for (const scheme of ['light', 'dark']) {
   check(tag('three replays are offered'), (await page.locator('[data-play]').count()) === 3);
   check(tag('the visitor is told to pick one'), (await page.textContent('.playerbar__label')).includes('Pick one'));
   check(tag('the empty workspace says what to do'), (await page.textContent('#email')).includes('Pick one of the three above'));
+  check(tag('the risk strip starts empty, not fake'), (await page.textContent('#risk')).includes('No submission open'));
   check(tag('no replay is preselected'), (await page.locator('[data-play][aria-pressed="true"]').count()) === 0);
   check(tag('each replay says what it shows'), (await page.textContent('[data-play="decline"]')).includes('twenty seconds'));
   check(tag('the trust model is on the page'), (await page.textContent('#limits')).includes('no password and no login'));
@@ -55,6 +56,7 @@ for (const scheme of ['light', 'dark']) {
   await page.click('[data-play="decline"]');
   await page.waitForSelector('#routing .btn--primary', { timeout: 30000 });
   check(tag('roofing reaches Likely Decline'), (await page.textContent('#routing')).includes('Likely Decline'));
+  check(tag('the risk strip turns red on the declined one'), (await page.locator('.risk__lane--likely_decline').count()) === 1);
   check(tag('appetite rule names the class'), (await page.textContent('#findings')).includes('5551'));
   check(tag('deadline pressure did not change the answer'), (await page.textContent('#transcript')).includes('regardless of the mod or the deadline'));
   await page.click('#routing .btn--primary');
@@ -70,6 +72,13 @@ for (const scheme of ['light', 'dark']) {
   check(tag('it says why the FEIN is not the desk\'s problem'),
     (await page.textContent('#transcript')).includes('you cannot supply it either'));
   check(tag('the FEIN is left blank, as it should be'), (await page.inputValue('#f-fein')) === '');
+  const risk = await page.textContent('#risk');
+  check(tag('the risk strip names the insured'), risk.includes('Cascade Millwork Inc.'));
+  check(tag('the risk strip carries the deciding numbers'),
+    risk.includes('$2,692,000') && risk.includes('1.18') && risk.includes('$92,400'));
+  check(tag('the risk strip flags a short loss history'), risk.includes('2 of 3'));
+  check(tag('the risk strip shows the lane'), risk.includes('Send for Info'));
+  check(tag('the email is clipped by default'), (await page.locator('.email__body--clipped').count()) === 1);
   check(tag('record filled from the documents'), (await page.inputValue('#f-named_insured')) === 'Cascade Millwork Inc.');
   check(tag('payroll shown with separators'), (await page.inputValue('#f-annual_payroll')) === '$2,692,000');
   check(tag('facts credited to each document'),

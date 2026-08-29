@@ -375,6 +375,54 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 .empty__h { font-size: 17px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 8px; }
 .empty__p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 62ch; }
 
+/* ---- the risk, at a glance -------------------------------------------- */
+.risk {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+  padding: 15px 17px 4px; box-shadow: var(--shadow);
+}
+.risk__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.risk__name {
+  font-size: 19px; font-weight: 600; letter-spacing: -.015em; line-height: 1.25; min-width: 0;
+}
+.risk__name--empty { color: var(--muted); font-weight: 500; }
+.risk__lane {
+  flex: none; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  color: #fff; white-space: nowrap;
+}
+.risk__lane--quote_now { background: var(--ok); }
+.risk__lane--indication { background: var(--warn); }
+.risk__lane--send_for_info { background: var(--accent); }
+.risk__lane--likely_decline { background: var(--stop); }
+.risk__sub { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.risk__stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 1px; margin: 15px -17px 0; background: var(--line);
+  border-top: 1px solid var(--line);
+}
+.stat { background: var(--panel); padding: 11px 17px 13px; }
+.stat__v {
+  font-size: 16px; font-weight: 600; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.stat__l {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin-top: 4px;
+}
+.stat--bad .stat__v { color: var(--stop); }
+.stat--soft .stat__v { color: var(--warn); }
+
+/* ---- the email, clipped by default ------------------------------------ */
+.email__body--clipped {
+  max-height: 132px; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
+  mask-image: linear-gradient(to bottom, #000 78%, transparent);
+}
+.email__more {
+  margin-top: 8px; padding: 0; border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 550; color: var(--accent);
+}
+.email__more:hover { text-decoration: underline; }
+
 
 /* ---- hosted preview only: the scripted agent -------------------------- */
 .playerbar {
@@ -483,6 +531,9 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
   <section class="col col--work">
     <h2 class="col__title">Submission</h2>
     <div id="email" class="card email"></div>
+
+    <h2 class="col__title col__title--spaced">The risk</h2>
+    <div id="risk" class="risk"></div>
 
     <h2 class="col__title col__title--spaced">Record</h2>
     <div id="record" class="record"></div>
@@ -1024,7 +1075,15 @@ function renderEmail() {
   head.append(el('div', 'email__subject', sub.subject));
   head.append(el('div', 'email__from', `${sub.from} · received ${sub.received}`));
   pane.append(head);
-  pane.append(el('pre', 'email__body', sub.body));
+  const body = el('pre', 'email__body email__body--clipped', sub.body);
+  pane.append(body);
+  const toggle = el('button', 'email__more', 'Show the whole email');
+  toggle.type = 'button';
+  toggle.addEventListener('click', () => {
+    const clipped = body.classList.toggle('email__body--clipped');
+    toggle.textContent = clipped ? 'Show the whole email' : 'Show less';
+  });
+  pane.append(toggle);
 
   const atts = el('div', 'atts');
   for (const a of sub.attachments) {
@@ -1212,6 +1271,59 @@ function renderReply() {
   actions.append(send, edit);
   box.append(actions);
   box.append(el('p', 'reply__note', 'Your agent wrote this. It cannot send it.'));
+}
+
+// --- The risk, at a glance --------------------------------------------------
+// An underwriter's first question is "what am I looking at". Seventeen text
+// inputs do not answer it. These six numbers do, and watching them land while
+// the agent reads is the clearest signal that anything is happening.
+const money0 = v => {
+  const n = Number(String(v).replace(/[$,\s]/g, ''));
+  return Number.isFinite(n) ? '$' + n.toLocaleString() : String(v);
+};
+
+function renderRisk() {
+  const box = $('#risk');
+  box.innerHTML = '';
+  const r = state.openSubmissionId ? evaluate() : null;
+  const rec = state.record;
+  const has = k => !isBlank(rec[k]);
+
+  const head = el('div', 'risk__head');
+  const name = el('div', 'risk__name', has('named_insured') ? rec.named_insured : 'No submission open');
+  if (!has('named_insured')) name.classList.add('risk__name--empty');
+  head.append(name);
+  if (r) {
+    const chip = el('span', `risk__lane risk__lane--${r.lane}`, r.laneLabel);
+    head.append(chip);
+  }
+  box.append(head);
+
+  const sub = el('div', 'risk__sub');
+  sub.textContent = has('governing_class')
+    ? `Class ${rec.governing_class}${has('class_description') ? ' · ' + rec.class_description : ''}`
+      + `${has('state') ? ' · ' + rec.state : ''}`
+    : 'Class and operations not read yet';
+  box.append(sub);
+
+  const stats = el('div', 'risk__stats');
+  const stat = (label, value, mods = '') => {
+    const cell = el('div', 'stat' + mods);
+    cell.append(el('div', 'stat__v', value));
+    cell.append(el('div', 'stat__l', label));
+    stats.append(cell);
+  };
+  stat('Annual payroll', has('annual_payroll') ? money0(rec.annual_payroll) : '—');
+  stat('Employees', has('employee_count') ? rec.employee_count : '—');
+  const mod = Number(rec.experience_mod);
+  stat('Experience mod', has('experience_mod') ? Number(mod).toFixed(2) : '—',
+    has('experience_mod') && mod > MAX_EXPERIENCE_MOD ? ' stat--bad' : '');
+  stat('Incurred losses', has('loss_run_incurred') ? money0(rec.loss_run_incurred) : '—',
+    has('loss_run_incurred') && Number(String(rec.loss_run_incurred).replace(/[$,]/g, '')) > MAX_INCURRED ? ' stat--bad' : '');
+  stat('Loss run years', has('loss_run_years') ? `${rec.loss_run_years} of ${MIN_LOSS_RUN_YEARS}` : '—',
+    has('loss_run_years') && Number(rec.loss_run_years) < MIN_LOSS_RUN_YEARS ? ' stat--soft' : '');
+  stat('Effective', has('effective_date') ? rec.effective_date : '—');
+  box.append(stats);
 }
 
 // --- Record form ------------------------------------------------------------
@@ -1520,6 +1632,7 @@ function render() {
   renderActionBar();
   renderInbox();
   renderEmail();
+  renderRisk();
   renderRecord();
   renderRules();
   renderReply();
