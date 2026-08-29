@@ -16,6 +16,18 @@ A wholesale insurance broker's submission desk receives an email from a retail a
 
 That job is a bad fit for full automation, because the expensive mistakes are the judgment calls. It's also a bad fit for a person doing all of it by hand, because most of the work is transcription.
 
+## The credential problem, which is the real argument
+
+Every existing way to automate this job needs somebody's password.
+
+The tools sold into this market today — Appulate, Submission Bridge, Skyvern — bridge data *into carrier portals* by driving a browser, and to do that they need stored carrier credentials or a service account. That is a security problem, an E&O problem, and a licensing problem all at once: a system acting on a licensed producer's authority, holding their credentials, with no clean answer to who is responsible for what it submits.
+
+**WebMCP removes the credential entirely.** The human signs in themselves. The agent has no password, no login, and no session of its own — it calls tools inside the session a licensed person already opened, with that person's permissions, and every action lands in the audit log under their name. There is nothing to store, nothing to rotate, and nothing to steal.
+
+The page states this plainly, on screen, in a panel headed **What your agent cannot do**: sign in or see your password, route a submission, settle a disagreement between two documents, send anything to a producer or a carrier, or reach any other site or tab. Those aren't policies we promise. Five of them are enforced by there being no tool to do it.
+
+That matters beyond security. No US regulator has yet answered whether an AI agency needs appointment, who the responsible licensed producer is, or who earns the commission — and Texas now requires a licensed human to review before a consequential action reaches a consumer or carrier. A design where the agent proposes and a named, licensed human decides is currently the only shape that is clearly compliant.
+
 ## Why this needs WebMCP, not a chatbot
 
 An agent can already read an email. It can't do the other four things this desk does:
@@ -50,7 +62,7 @@ Every required field carries its own reason in `assets/state.js`, so the page ca
 
 ## How WebMCP is implemented
 
-The whole agent-facing surface is one file: [`assets/webmcp.js`](assets/webmcp.js). Seven tools, registered on the top-level document.
+The whole agent-facing surface is one file: [`assets/webmcp.js`](assets/webmcp.js). Eight tools, registered on the top-level document.
 
 | Tool | Read-only | What it does |
 |---|:--:|---|
@@ -61,6 +73,7 @@ The whole agent-facing surface is one file: [`assets/webmcp.js`](assets/webmcp.j
 | `check_submission` | ✓ | Runs the underwriting rules. Returns what's missing, what contradicts, what's out of appetite, and the current lane. |
 | `ask_underwriter` | ✓ | Raises a field to the human: highlights it, explains why it matters, hands the agent the words to say. Changes no data. |
 | `propose_routing` | | Puts a lane and its reasoning on screen. **Routes nothing.** A person clicks. |
+| `draft_reply` | | Writes the email back to the producer naming what is still needed. **Sends nothing.** A person reads it, edits it, sends it. |
 
 Every tool is a thin wrapper over a function the underwriter's own buttons call ([`assets/ui.js`](assets/ui.js)). There is no separate agent code path, so the tools cannot drift away from the interface.
 
@@ -114,7 +127,7 @@ npm test
 `test/shot.mjs` writes screenshots of the desk mid-scenario in both light and dark.
 
 `test/preview.mjs` drives the hosted preview end to end — presses play, checks the contradiction is
-shown with its receipts, settles it, and confirms it resumes to a routing proposal. 38 checks.
+shown with its receipts, settles it, and confirms it resumes to a routing proposal and a drafted reply. 54 checks.
 
 ### The hosted preview
 
@@ -134,7 +147,7 @@ Three submissions in the queue, each landing in a different lane:
 |---|---|
 | **Harbor & Vine Restaurant Group** | Clean and complete. Three years of loss runs, mod 0.92, in appetite. → **Quote Now** |
 | **Ridgeline Roofing** | Producer is pushing hard for a Friday quote. Governing class 5551 is prohibited. → **Likely Decline**, in about twenty seconds. |
-| **Cascade Millwork** | The application and the loss run disagree, and the FEIN is missing. → **Send for Info**, until a person settles it — then **Indication**, because the loss runs only cover two years. |
+| **Cascade Millwork** | The application and the loss run disagree, and the FEIN is missing. → **Send for Info**, until a person settles it — then **Indication**, because the loss runs only cover two years. The agent then drafts the reply asking for the missing year, and leaves it for the underwriter to send. |
 
 ---
 

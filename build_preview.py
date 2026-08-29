@@ -78,17 +78,20 @@ ui_js = ui_js.replace(body.group(0), (
 
 # --- 4. Body markup, lifted from the real page ------------------------------
 body_html = re.search(r"<body>\n(.*?)\n<script type=\"module\">", index, re.S).group(1)
-body_html = body_html.replace(
-    '<p class="demobar">\n  Demonstration only. Every business, producer, document and claim below is invented.\n'
-    '  Ask your agent: <em>“Work the Cascade Millwork submission.”</em>\n</p>',
-    PLAYER_BAR := """<div class="playerbar">
+PLAYER_BAR = """<div class="playerbar">
   <button id="play" type="button" class="btn btn--primary">Watch the agent work a submission</button>
   <span id="play-note" class="playerbar__note">
-    Scripted replay of a real session. Every step below is an actual tool call.
-    It will stop and wait for you partway through.
+    <strong>The job:</strong> read the email, open two PDFs, retype fifteen numbers, decide what happens
+    to it. Forty times a week. This hands the typing to an AI agent and keeps every decision.
+    Scripted replay — every step is a real tool call, and it stops and waits for you partway through.
   </span>
   <button id="reset" type="button" class="btn btn--ghost">Reset</button>
-</div>""")
+</div>"""
+
+# Swap the whole demobar element for the player, matching the element rather
+# than its wording so copy edits upstream cannot silently break this build.
+body_html, n = re.subn(r'<p class="demobar">.*?</p>', PLAYER_BAR, body_html, flags=re.S)
+assert n == 1, f"expected one demobar, found {n}"
 
 # The agent transcript sits at the top of the triage column.
 body_html = body_html.replace(
@@ -265,6 +268,28 @@ async function resume() {
     rationale: 'In appetite: class 2802, mod 1.18, $92,400 incurred — all inside the guidelines. The loss run only covers two policy years, so we can price a ballpark but cannot firm it up until the missing year comes in.',
   });
   say('agent', 'I have put Indication on screen with my reasoning. I am not routing it — approve or reject it and it is done.');
+  await wait(1400);
+
+  t = say('agent', 'Writing the reply to Priya so you do not have to…', true);
+  await run('draft_reply', {
+    subject: 'Cascade Millwork Inc. — 10/1 effective — need one more year of loss runs',
+    body: `Hi Priya,
+
+Thanks for sending Cascade Millwork over. We can put an indication together, but two things came up going through it.
+
+1. The application answers "no losses in the past 3 years," and the attached loss run from Midwest Indemnity shows 4 claims and $92,400 incurred for 10/01/2024 to 07/15/2026. We are going with the loss run. Worth flagging to the insured so the next application is right.
+
+2. The loss run only covers two policy years. We need the third — 10/01/2023 to 10/01/2024 — valued within the last 90 days, to firm this up into a quote. Midwest Indemnity should be able to pull it.
+
+We also had to source the FEIN separately; the application left it blank.
+
+Send the missing year over and we will turn it around quickly.
+
+Justin`,
+  });
+  await wait(700);
+  t.remove();
+  say('agent', 'Draft is on screen. Read it, change anything you want, and send it. I cannot send it myself.');
   playBtn.textContent = 'Start over';
   playBtn.disabled = false;
   playBtn.onclick = () => { playBtn.onclick = play; resetAll(); };

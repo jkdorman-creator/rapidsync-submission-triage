@@ -26,6 +26,10 @@
     </div>
   </div>
   <div class="topbar__right">
+    <div class="who">
+      <div class="who__name" id="who-name"></div>
+      <div class="who__meta" id="who-meta"></div>
+    </div>
     <span id="tool-status" class="pill">Checking for site tools…</span>
   </div>
 </header>
@@ -34,8 +38,10 @@
 </div>
 
 <p class="demobar">
-  Demonstration only. Every business, producer, document and claim below is invented.
-  Ask your agent: <em>“Work the Cascade Millwork submission.”</em>
+  <strong>The job:</strong> open the email, open the attachments, retype fifteen numbers, decide what
+  happens to it. Forty times a week. Re-keying into portals is the thing insurance agents name as the
+  worst part of their week. This page hands the typing to an AI agent and keeps every decision.
+  <span class="demobar__fine">Demonstration only — every business, producer, document and claim below is invented.</span>
 </p>
 
 <main class="desk">
@@ -44,6 +50,9 @@
   <section class="col col--queue">
     <h2 class="col__title">Queue</h2>
     <div id="inbox" class="inbox"></div>
+
+    <h2 class="col__title col__title--spaced">What your agent cannot do</h2>
+    <div id="limits" class="card limits"></div>
   </section>
 
   <!-- WORKSPACE -------------------------------------------------------- -->
@@ -77,6 +86,9 @@
 
     <h2 class="col__title col__title--spaced">Routing decision</h2>
     <div id="routing" class="card"></div>
+
+    <h2 class="col__title col__title--spaced">Reply to the producer</h2>
+    <div id="reply" class="card"></div>
 
     <h2 class="col__title col__title--spaced">Activity</h2>
     <div id="activity" class="card activity"></div>

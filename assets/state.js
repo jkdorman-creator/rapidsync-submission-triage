@@ -64,6 +64,24 @@ export const LANES = {
 };
 
 // --- Live state -------------------------------------------------------------
+// The person at the desk. They signed in; the agent did not, and cannot.
+export const DESK_USER = {
+  name: 'J. Dorman',
+  role: 'Underwriter',
+  license: 'MI producer #0847213',
+  signedInAt: '7:52 AM',
+};
+
+// What the agent is structurally unable to do here. Shown to the user, because
+// the honest answer to "what is this thing allowed to do" should be on screen.
+export const AGENT_LIMITS = [
+  'Sign in, or see your password. You signed in; it works inside that session.',
+  'Route a submission. It proposes a lane; you approve it.',
+  'Settle a disagreement between two documents. There is no tool for that.',
+  'Send anything to a producer or a carrier. It drafts; you send.',
+  'Reach any other site or tab. Its tools exist only on this page.',
+];
+
 export const state = {
   openSubmissionId: null,
   record: Object.fromEntries(FIELD_KEYS.map(k => [k, null])),
@@ -72,6 +90,8 @@ export const state = {
   decision: null,        // { lane, at } once a human confirms
   pendingQuestion: null, // { field, question, why }
   documents: {},         // attachmentId -> { name, kind, text } once read
+  reply: null,           // { subject, body, at } drafted by the agent, sent by a person
+  replySent: null,
   resolutions: {},       // conflict code -> { trusted, label, at, by }
   log: [],               // tool-call activity
 };
@@ -84,6 +104,8 @@ export function resetRecord() {
   state.pendingQuestion = null;
   state.documents = {};
   state.resolutions = {};
+  state.reply = null;
+  state.replySent = null;
 }
 
 const num = v => {

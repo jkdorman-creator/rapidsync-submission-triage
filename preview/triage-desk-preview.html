@@ -330,6 +330,44 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
   font-size: 11px; line-height: 1.6;
 }
 
+/* ---- who is signed in ------------------------------------------------- */
+.topbar__right { display: flex; align-items: center; gap: 16px; }
+.who { text-align: right; line-height: 1.35; }
+.who__name { font-size: 12.5px; font-weight: 600; }
+.who__meta {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px; color: var(--muted);
+}
+@media (max-width: 720px) { .who { display: none; } }
+
+.demobar strong { color: var(--ink); font-weight: 600; }
+.demobar__fine { display: block; margin-top: 4px; font-size: 11.5px; opacity: .8; }
+
+/* ---- what the agent cannot do ----------------------------------------- */
+.limits__lead { margin: 0 0 10px; font-size: 12.5px; line-height: 1.55; color: var(--ink); }
+.limits__list { margin: 0; padding-left: 17px; }
+.limits__list li {
+  font-size: 12px; line-height: 1.5; color: var(--muted); margin-bottom: 7px;
+}
+.limits__list li::marker { color: var(--stop); }
+
+/* ---- the drafted reply ------------------------------------------------- */
+.reply__to {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px; color: var(--muted); margin-bottom: 5px;
+}
+.reply__subject { font-size: 13.5px; font-weight: 600; margin-bottom: 10px; }
+.reply__body {
+  margin: 0 0 13px; white-space: pre-wrap; font: inherit; font-size: 12.5px;
+  line-height: 1.6; max-height: 250px; overflow: auto;
+}
+.reply__body--editing {
+  outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 4px;
+}
+.reply__actions { display: flex; gap: 8px; }
+.reply__note { margin: 11px 0 0; font-size: 11.5px; color: var(--muted); }
+.reply__sent { font-size: 12.5px; font-weight: 550; color: var(--ok); }
+
 
 /* ---- hosted preview only: the scripted agent -------------------------- */
 .playerbar {
@@ -375,6 +413,10 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
     </div>
   </div>
   <div class="topbar__right">
+    <div class="who">
+      <div class="who__name" id="who-name"></div>
+      <div class="who__meta" id="who-meta"></div>
+    </div>
     <span id="tool-status" class="pill">Checking for site tools…</span>
   </div>
 </header>
@@ -385,8 +427,9 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 <div class="playerbar">
   <button id="play" type="button" class="btn btn--primary">Watch the agent work a submission</button>
   <span id="play-note" class="playerbar__note">
-    Scripted replay of a real session. Every step below is an actual tool call.
-    It will stop and wait for you partway through.
+    <strong>The job:</strong> read the email, open two PDFs, retype fifteen numbers, decide what happens
+    to it. Forty times a week. This hands the typing to an AI agent and keeps every decision.
+    Scripted replay — every step is a real tool call, and it stops and waits for you partway through.
   </span>
   <button id="reset" type="button" class="btn btn--ghost">Reset</button>
 </div>
@@ -397,6 +440,9 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
   <section class="col col--queue">
     <h2 class="col__title">Queue</h2>
     <div id="inbox" class="inbox"></div>
+
+    <h2 class="col__title col__title--spaced">What your agent cannot do</h2>
+    <div id="limits" class="card limits"></div>
   </section>
 
   <!-- WORKSPACE -------------------------------------------------------- -->
@@ -433,6 +479,9 @@ code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 
     <h2 class="col__title col__title--spaced">Routing decision</h2>
     <div id="routing" class="card"></div>
+
+    <h2 class="col__title col__title--spaced">Reply to the producer</h2>
+    <div id="reply" class="card"></div>
 
     <h2 class="col__title col__title--spaced">Activity</h2>
     <div id="activity" class="card activity"></div>
@@ -541,6 +590,24 @@ const LANES = {
 };
 
 // --- Live state -------------------------------------------------------------
+// The person at the desk. They signed in; the agent did not, and cannot.
+const DESK_USER = {
+  name: 'J. Dorman',
+  role: 'Underwriter',
+  license: 'MI producer #0847213',
+  signedInAt: '7:52 AM',
+};
+
+// What the agent is structurally unable to do here. Shown to the user, because
+// the honest answer to "what is this thing allowed to do" should be on screen.
+const AGENT_LIMITS = [
+  'Sign in, or see your password. You signed in; it works inside that session.',
+  'Route a submission. It proposes a lane; you approve it.',
+  'Settle a disagreement between two documents. There is no tool for that.',
+  'Send anything to a producer or a carrier. It drafts; you send.',
+  'Reach any other site or tab. Its tools exist only on this page.',
+];
+
 const state = {
   openSubmissionId: null,
   record: Object.fromEntries(FIELD_KEYS.map(k => [k, null])),
@@ -549,6 +616,8 @@ const state = {
   decision: null,        // { lane, at } once a human confirms
   pendingQuestion: null, // { field, question, why }
   documents: {},         // attachmentId -> { name, kind, text } once read
+  reply: null,           // { subject, body, at } drafted by the agent, sent by a person
+  replySent: null,
   resolutions: {},       // conflict code -> { trusted, label, at, by }
   log: [],               // tool-call activity
 };
@@ -561,6 +630,8 @@ function resetRecord() {
   state.pendingQuestion = null;
   state.documents = {};
   state.resolutions = {};
+  state.reply = null;
+  state.replySent = null;
 }
 
 const num = v => {
@@ -824,6 +895,26 @@ function renderLog() {
 }
 
 // --- Inbox ------------------------------------------------------------------
+// The signed-in human, named in the header. The agent has no identity here: it
+// borrows this one, and every action it takes is logged against it.
+function renderWho() {
+  $('#who-name').textContent = `${DESK_USER.name} · ${DESK_USER.role}`;
+  $('#who-meta').textContent = `${DESK_USER.license} · signed in ${DESK_USER.signedInAt}`;
+}
+
+function renderLimits() {
+  const box = $('#limits');
+  if (box.dataset.done) return;   // static content, render once
+  box.dataset.done = '1';
+  const lead = el('p', 'limits__lead',
+    'It has no password and no login of its own. It works inside the session you opened, '
+    + 'with your permissions, and everything it does is logged under your name.');
+  box.append(lead);
+  const ul = el('ul', 'limits__list');
+  for (const line of AGENT_LIMITS) ul.append(el('li', null, line));
+  box.append(ul);
+}
+
 function renderInbox() {
   const list = $('#inbox');
   list.innerHTML = '';
@@ -1014,6 +1105,53 @@ function rejectRoute() {
   logToolCall('(underwriter)', `Rejected routing to ${LANES[state.proposal.lane].label}`, 'human');
   state.proposal = null;
   render();
+}
+
+// --- The reply the agent writes and a person sends --------------------------
+function draftReply(subject, body) {
+  state.reply = { subject, body, at: new Date() };
+  state.replySent = null;
+  render();
+  return state.reply;
+}
+
+function sendReply() {
+  if (!state.reply) return;
+  state.replySent = new Date();
+  logToolCall('(underwriter)', 'Sent the reply to the producer', 'human');
+  render();
+}
+
+function renderReply() {
+  const box = $('#reply');
+  box.innerHTML = '';
+  if (!state.reply) {
+    box.append(el('p', 'muted', 'Nothing drafted yet.'));
+    return;
+  }
+  const sub = openSubmission();
+  box.append(el('div', 'reply__to', `To: ${sub ? sub.from : ''}`));
+  box.append(el('div', 'reply__subject', state.reply.subject));
+  box.append(el('pre', 'reply__body', state.reply.body));
+  if (state.replySent) {
+    box.append(el('div', 'reply__sent', `Sent by you at ${state.replySent.toLocaleTimeString()}`));
+    return;
+  }
+  const actions = el('div', 'reply__actions');
+  const send = el('button', 'btn btn--primary', 'Send it');
+  send.type = 'button';
+  send.addEventListener('click', sendReply);
+  const edit = el('button', 'btn btn--ghost', 'Edit first');
+  edit.type = 'button';
+  edit.addEventListener('click', () => {
+    const pre = box.querySelector('.reply__body');
+    pre.contentEditable = 'true';
+    pre.focus();
+    pre.classList.add('reply__body--editing');
+  });
+  actions.append(send, edit);
+  box.append(actions);
+  box.append(el('p', 'reply__note', 'Your agent wrote this. It cannot send it.'));
 }
 
 // --- Record form ------------------------------------------------------------
@@ -1290,11 +1428,14 @@ function focusField(key) {
 }
 
 function render() {
+  renderWho();
+  renderLimits();
   renderActionBar();
   renderInbox();
   renderEmail();
   renderRecord();
   renderRules();
+  renderReply();
 }
 
 function setToolStatus(text, ok = true) {
@@ -1567,6 +1708,32 @@ const TOOLS = [
       return `Proposed ${LANES[key].label} on screen with your reasoning. ${agree} Nothing has been routed. Tell the user it is waiting for them to approve or reject it.`;
     },
   },
+  // -------------------------------------------------------------- 8
+  {
+    name: 'draft_reply',
+    title: 'Draft the reply to the producer',
+    description:
+      'Writes the email back to the producing agent asking for exactly what this submission still needs, and puts it on screen. It is not sent. The underwriter reads it, edits it if they want, and sends it themselves. Use after check_submission, once you know what is actually missing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject: { type: 'string', description: 'Subject line. Name the insured and the effective date.' },
+        body: { type: 'string', description: 'The email itself. List each thing needed as its own line, and say why it is needed.' },
+      },
+      required: ['subject', 'body'],
+    },
+    annotations: { readOnlyHint: false, untrustedContentHint: false },
+    async execute({ subject, body }) {
+      const sub = openSubmission();
+      if (!sub) return 'No submission is open. Call open_submission first.';
+      const s = String(subject || '').trim();
+      const b = String(body || '').trim();
+      if (!s || !b) return 'Pass both a subject and a body. The underwriter is going to read this before it goes out.';
+      draftReply(s, b);
+      logToolCall('draft_reply', `Drafted a reply to ${sub.agency}`, 'propose');
+      return `Drafted the reply to ${sub.from} and put it on screen with Send and Edit buttons. It has NOT been sent — you cannot send it. Tell the user it is waiting for them to read and send.`;
+    },
+  },
 ];
 
 // --- Registration -----------------------------------------------------------
@@ -1735,6 +1902,28 @@ async function resume() {
     rationale: 'In appetite: class 2802, mod 1.18, $92,400 incurred — all inside the guidelines. The loss run only covers two policy years, so we can price a ballpark but cannot firm it up until the missing year comes in.',
   });
   say('agent', 'I have put Indication on screen with my reasoning. I am not routing it — approve or reject it and it is done.');
+  await wait(1400);
+
+  t = say('agent', 'Writing the reply to Priya so you do not have to…', true);
+  await run('draft_reply', {
+    subject: 'Cascade Millwork Inc. — 10/1 effective — need one more year of loss runs',
+    body: `Hi Priya,
+
+Thanks for sending Cascade Millwork over. We can put an indication together, but two things came up going through it.
+
+1. The application answers "no losses in the past 3 years," and the attached loss run from Midwest Indemnity shows 4 claims and $92,400 incurred for 10/01/2024 to 07/15/2026. We are going with the loss run. Worth flagging to the insured so the next application is right.
+
+2. The loss run only covers two policy years. We need the third — 10/01/2023 to 10/01/2024 — valued within the last 90 days, to firm this up into a quote. Midwest Indemnity should be able to pull it.
+
+We also had to source the FEIN separately; the application left it blank.
+
+Send the missing year over and we will turn it around quickly.
+
+Justin`,
+  });
+  await wait(700);
+  t.remove();
+  say('agent', 'Draft is on screen. Read it, change anything you want, and send it. I cannot send it myself.');
   playBtn.textContent = 'Start over';
   playBtn.disabled = false;
   playBtn.onclick = () => { playBtn.onclick = play; resetAll(); };

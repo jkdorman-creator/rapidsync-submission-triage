@@ -1,0 +1,377 @@
+<title>WebMCP in Insurance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+:root {
+  color-scheme: light dark;
+  --paper: #fbfbfc;
+  --panel: #ffffff;
+  --ink: #14171c;
+  --ink-soft: #3d444f;
+  --muted: #6b7280;
+  --rule: #e2e5ea;
+  --accent: #0f6fd6;
+  --solid: #157347;   /* well evidenced */
+  --soft: #a86200;    /* directional */
+  --against: #b32318; /* counter-evidence */
+  --open: #6b3fb8;    /* unresolved, needs a judgment call */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1116; --panel: #161a21; --ink: #e7eaee; --ink-soft: #bfc6d0;
+    --muted: #98a1ae; --rule: #262c36; --accent: #4d9bf0;
+    --solid: #4ec07f; --soft: #e0a55c; --against: #f2837a; --open: #b39ae8;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1116; --panel: #161a21; --ink: #e7eaee; --ink-soft: #bfc6d0;
+  --muted: #98a1ae; --rule: #262c36; --accent: #4d9bf0;
+  --solid: #4ec07f; --soft: #e0a55c; --against: #f2837a; --open: #b39ae8;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16.5px; line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px 96px; }
+.col { max-width: 68ch; }
+
+/* masthead ---------------------------------------------------------- */
+.masthead { padding: 56px 0 34px; border-bottom: 2px solid var(--ink); margin-bottom: 40px; }
+.eyebrow {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 11.5px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--muted); margin-bottom: 16px;
+}
+h1 {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: clamp(30px, 4.6vw, 46px); font-weight: 600; line-height: 1.08;
+  letter-spacing: -.022em; margin: 0 0 18px; text-wrap: balance; max-width: 20ch;
+}
+.standfirst {
+  font-size: 19px; line-height: 1.55; color: var(--ink-soft);
+  margin: 0; max-width: 60ch;
+}
+.byline {
+  font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted);
+  margin-top: 22px;
+}
+
+/* structure --------------------------------------------------------- */
+h2 {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 25px; font-weight: 600; letter-spacing: -.015em; line-height: 1.2;
+  margin: 62px 0 6px; text-wrap: balance;
+}
+h2 + .deck {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 13.5px; color: var(--muted); margin: 0 0 22px;
+}
+h3 {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 17px; font-weight: 600; letter-spacing: -.008em;
+  margin: 34px 0 8px;
+}
+p { margin: 0 0 17px; }
+strong { font-weight: 500; color: var(--ink); }
+em { font-style: italic; }
+a { color: var(--accent); text-underline-offset: 2px; }
+.lede::first-letter { /* deliberately none — this is a memo, not a magazine */ }
+
+/* verdict cards ------------------------------------------------------ */
+.verdicts { display: grid; gap: 12px; margin: 30px 0 8px; }
+.verdict {
+  background: var(--panel); border: 1px solid var(--rule);
+  border-left: 4px solid var(--rule); border-radius: 0 10px 10px 0;
+  padding: 15px 18px;
+}
+.verdict--yes { border-left-color: var(--solid); }
+.verdict--no { border-left-color: var(--against); }
+.verdict--maybe { border-left-color: var(--soft); }
+.verdict--open { border-left-color: var(--open); }
+.verdict__tag {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .09em; margin-bottom: 6px;
+}
+.verdict--yes .verdict__tag { color: var(--solid); }
+.verdict--no .verdict__tag { color: var(--against); }
+.verdict--maybe .verdict__tag { color: var(--soft); }
+.verdict--open .verdict__tag { color: var(--open); }
+.verdict p { margin: 0; font-size: 15.5px; line-height: 1.55; }
+
+/* figures ------------------------------------------------------------ */
+.figs {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+  border-radius: 10px; overflow: hidden; margin: 28px 0;
+}
+.fig { background: var(--panel); padding: 16px 17px; }
+.fig__n {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 27px; font-weight: 600; letter-spacing: -.03em; line-height: 1;
+  font-variant-numeric: tabular-nums; margin-bottom: 7px;
+}
+.fig__t {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 12.5px; line-height: 1.45; color: var(--ink-soft);
+}
+.fig__s {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+  color: var(--muted); margin-top: 7px;
+}
+
+/* table -------------------------------------------------------------- */
+.tablewrap { overflow-x: auto; margin: 26px 0; }
+table { border-collapse: collapse; width: 100%; min-width: 660px; }
+th, td {
+  text-align: left; padding: 13px 15px 13px 0; vertical-align: top;
+  border-bottom: 1px solid var(--rule);
+  font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 14px; line-height: 1.5;
+}
+th {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--ink);
+}
+td:first-child { font-weight: 500; white-space: nowrap; padding-right: 24px; }
+.gain { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; white-space: nowrap; }
+.gain--big { color: var(--solid); }
+.gain--mid { color: var(--soft); }
+.gain--low { color: var(--against); }
+
+/* pull quote --------------------------------------------------------- */
+blockquote {
+  margin: 30px 0; padding: 4px 0 4px 22px; border-left: 3px solid var(--accent);
+  font-size: 18.5px; line-height: 1.5; color: var(--ink);
+}
+blockquote cite {
+  display: block; margin-top: 11px; font-style: normal;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 12.5px; color: var(--muted);
+}
+
+ul { margin: 0 0 17px; padding-left: 21px; }
+li { margin-bottom: 9px; }
+
+.callout {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 19px 21px; margin: 28px 0;
+}
+.callout__h {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--open); margin-bottom: 9px;
+}
+.callout p:last-child { margin-bottom: 0; }
+
+/* sources ------------------------------------------------------------ */
+.sources { margin-top: 68px; padding-top: 26px; border-top: 2px solid var(--ink); }
+.sources h2 { margin-top: 0; font-size: 19px; }
+.sources ul { list-style: none; padding: 0; columns: 2; column-gap: 34px; }
+@media (max-width: 720px) { .sources ul { columns: 1; } }
+.sources li {
+  break-inside: avoid; margin-bottom: 11px;
+  font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 12.5px; line-height: 1.45;
+}
+.sources a { text-decoration: none; }
+.sources a:hover { text-decoration: underline; }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="eyebrow">RapidSync Specialty · Strategy note</div>
+  <h1>Does a browser tool layer actually help insurance?</h1>
+  <p class="standfirst">Mostly not where you would expect. It is close to useless for people shopping for insurance, and it is the most credible fix anyone has for the single worst job in commercial distribution.</p>
+  <div class="byline">29 August 2026 · written against research current to this date</div>
+</header>
+
+<div class="col">
+
+<h2>The short answer</h2>
+<p class="deck">Four claims, in order of how confident I am in them.</p>
+
+<div class="verdicts">
+  <div class="verdict verdict--yes">
+    <div class="verdict__tag">Well evidenced</div>
+    <p>The problem is real and nobody has fixed it. <strong>74% of agents name re-keying risk data into carrier portals as their single worst pain</strong>, and 90% have moved business away from a carrier over submission friction. The flagship agency system's commercial workflow is "generate a PDF and email it."</p>
+  </div>
+  <div class="verdict verdict--no">
+    <div class="verdict__tag">Counter-evidence</div>
+    <p>WebMCP cannot help a consumer buy insurance, and that race is already over. There is <strong>no discovery in WebMCP</strong> — an agent only sees your tools once it is already on your page. Consumer agentic insurance is being built right now inside ChatGPT over server-side MCP, and Insurify is already serving bindable auto quotes there.</p>
+  </div>
+  <div class="verdict verdict--maybe">
+    <div class="verdict__tag">Directional</div>
+    <p>The valid use is the professional desk — agents in carrier portals, brokers in submission queues, underwriters in workbenches. People who sit in a browser all day on a handful of known sites. Everything that makes WebMCP weak for consumers is fine or actively useful there.</p>
+  </div>
+  <div class="verdict verdict--open">
+    <div class="verdict__tag">Unresolved</div>
+    <p>Apple probably does not decide this. Their silence is loud, but the desk runs on desktop Chrome and Edge in an office. The thing that decides it is whether carriers put tools on the portals they already own — and whether Applied Systems gets there first.</p>
+  </div>
+</div>
+
+<h2>Who this helps, and why</h2>
+<p class="deck">Start with what WebMCP actually is, because that constrains the answer hard.</p>
+
+<p>A website declares a few functions as tools. An AI agent already on that page can call them. That is the whole mechanism, and it carries two properties that decide everything downstream.</p>
+
+<p><strong>There is no discovery.</strong> Nothing about WebMCP helps an agent find your site. No registry, no crawl, no manifest. Tools become visible only once a page is loaded in a tab. Any pitch that WebMCP makes you "findable by AI agents" is selling something else.</p>
+
+<p><strong>The agent inherits the browser session.</strong> On the open consumer web that is a liability — it is why the security literature on this is nervous. Behind a login, on a desk, it is exactly right: the agent acts as the person who is logged in, with their permissions, and every action lands in the audit log under their name. No new credentials, no service account, no OAuth dance with forty carriers.</p>
+
+<p>Put those together and the answer falls out. WebMCP is useless for acquisition and good for <em>repetition inside a known, authenticated workspace</em>. In insurance, that is one specific person: the one moving the same fifteen fields from a PDF into a portal, forty times a week.</p>
+
+<div class="figs">
+  <div class="fig">
+    <div class="fig__n">74%</div>
+    <div class="fig__t">of agents name re-keying data into carrier portals as their top pain point</div>
+    <div class="fig__s">Applied / Ivans 2026, n=702</div>
+  </div>
+  <div class="fig">
+    <div class="fig__n">49%</div>
+    <div class="fig__t">of commercial-heavy agencies still submit business by email</div>
+    <div class="fig__s">Applied / Ivans 2026</div>
+  </div>
+  <div class="fig">
+    <div class="fig__n">24%</div>
+    <div class="fig__t">of agencies use any commercial quoting platform at all</div>
+    <div class="fig__s">Catalyit, n=441</div>
+  </div>
+  <div class="fig">
+    <div class="fig__n">86</div>
+    <div class="fig__t">carriers and MGAs offering any API-enabled product, against ~500 reachable by the download rail</div>
+    <div class="fig__s">Herald Insurance API Index</div>
+  </div>
+</div>
+
+<h2>What exists today, and what it proves</h2>
+<p class="deck">The strongest argument for this project is a structural gap nobody has closed in forty years.</p>
+
+<h3>The pipes run backwards</h3>
+
+<p>The industry does have mature connectivity. ACORD AL3 and IVANS Download reach roughly 500 carriers and 20,000 agencies. But read what they actually do: they carry policy data <em>from</em> the carrier <em>to</em> the agency, <em>after</em> the policy is bound. IVANS' own datasheet says the process begins "after you have bound your client's insurance policy."</p>
+
+<p>There has never been an equivalent rail going the other way. No standard upload path for a submission. That is the hole. Forty years of connectivity investment, all of it pointed at data coming back.</p>
+
+<p>What filled the gap instead is instructive. Appulate has spent twenty years building "A2X," which converts ACORD forms to XML and <strong>bridges the data into carrier portals</strong> — a business that exists precisely because carriers will not open APIs. Submission Bridge and Skyvern now sell AI browser automation against the same portals, complete with "self-healing AI that adapts when portals change." That phrase is the tell. These are scrapers, and they break.</p>
+
+<blockquote>
+  30%, 40%, 50% of the time in that process the carrier never returns a quote.
+  <cite>Graham Blackwell, President, Applied Systems</cite>
+</blockquote>
+
+<h3>The industry bought the wrong half</h3>
+
+<p>Meanwhile several hundred million dollars has gone into submission-intake AI — Cytora, Federato, Send, Kalepa, Convr, Sixfold, Indico. Look at who buys them: carriers and MGAs, almost never retail agents. Every one of these products works on the <em>receiving</em> side. They help a carrier read the PDF faster.</p>
+
+<p>That is an industry-wide investment in <strong>tolerating</strong> PDF-over-email rather than replacing it. Which is either the strongest argument that the sending side is a real unsolved market, or the strongest argument that everyone has already decided it is unfixable. I lean toward the first, because the demand is documented and unmet: 79% of agents name commercial submission automation as the top thing they want from carriers.</p>
+
+<h3>Why a carrier might do this when they will not build an API</h3>
+
+<p>This is the non-obvious part, and it is the best argument in the whole analysis.</p>
+
+<p>Carriers resist APIs for a reason that has nothing to do with engineering. An API disintermediates them — the agent never sees the carrier's brand, their appetite guidance, their cross-sell, their underwriting questions. The carrier becomes a price in someone else's grid.</p>
+
+<p><strong>WebMCP does not do that.</strong> The tools sit on the carrier's own page. The human is still looking at the carrier's UI while the agent fills it. The carrier keeps the surface and loses only the typing. And the build cost is a fraction of an API: a JavaScript shim over handlers that already exist, no new auth, no versioning, no partner onboarding, no rate-limit infrastructure.</p>
+
+<p>Set that against the fact that 76% of agents now say the digital submission experience matters more to them than commission, and 90% have already moved business over it, and there is a real commercial reason for a carrier to ship this.</p>
+
+<h2>If it standardizes and Apple adopts</h2>
+<p class="deck">Four audiences, and they are helped very unequally.</p>
+
+<div class="tablewrap">
+<table>
+  <thead>
+    <tr><th>Who</th><th>What actually changes</th><th>Gain</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Consumers</td>
+      <td>Least helped, and Apple matters most here. Their blocker is not navigating a form — it is not possessing payroll by class code, an experience mod from the state bureau, or 90-day-valued loss runs. An agent can fill the form; it cannot conjure the documents. And this channel is already being won by server-side MCP inside ChatGPT, which needs no browser standard at all.</td>
+      <td class="gain gain--low">marginal</td>
+    </tr>
+    <tr>
+      <td>Retail agents</td>
+      <td>The biggest single winner, by a wide margin. Their #1 documented pain is literally the thing this fixes. If carriers ship tools on the portals agents already log into, an agent's assistant works every portal without a per-portal scraper that breaks on the next redesign. This alone justifies the standard.</td>
+      <td class="gain gain--big">large</td>
+    </tr>
+    <tr>
+      <td>Wholesale brokers</td>
+      <td>Winner on intake — their own desk, their own rules, their own tools, which is exactly what our demo is. Second-order: a wholesaler that exposes a good tool layer becomes the easy place for a retailer's agent to send business, which is a distribution advantage rather than an efficiency one.</td>
+      <td class="gain gain--big">large</td>
+    </tr>
+    <tr>
+      <td>Carriers</td>
+      <td>Cheap agent preference. They ship tools on the portal they already run, keep their brand in front of the human, and win submissions from agents who are voting with their business. The risk they will worry about is losing control of what gets submitted — which is an argument for tools that validate, not tools that just accept.</td>
+      <td class="gain gain--mid">moderate</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>The pattern is worth naming: <strong>the audiences helped most are the ones who need Apple least.</strong> An underwriting desk runs on desktop Chrome or Edge in an office. Apple holds 11% of US desktop. Where Apple genuinely decides the outcome — mobile, where they have 52% share and where every iOS browser is WebKit underneath — is the consumer channel that WebMCP was never going to win anyway.</p>
+
+<h2>The case against, stated properly</h2>
+<p class="deck">These are the things that would make me wrong.</p>
+
+<p><strong>Apple has not spoken, and the silence is not neutral.</strong> The WebKit standards-position issue has sat open for three months with zero engineer comments and eight separate <em>concerns</em> labels — including "venue," questioning whether the working group is even legitimate, and "duplication," which reads as <em>we already have this</em>. WebKit publicly lists sixteen APIs it declined outright on fingerprinting grounds. None of them ever recovered commercially. When Apple does ship a contested capability it takes three to eight years and sometimes arrives crippled, as Web Push did on iOS.</p>
+
+<p><strong>Apple is building the competing layer, and it is not on the web.</strong> App Intents replaced SiriKit at WWDC 2026 with a forced migration. Apple already ships an agent that navigates websites to upgrade weak passwords — built on a narrow well-known-URL convention, not a general tool layer. That is their revealed preference. Safari's own MCP server is a developer debugging tool that drives the browser from outside, which is architecturally the <em>inverse</em> of WebMCP.</p>
+
+<p><strong>Adoption today is approximately zero.</strong> Chrome and Edge origin trials only. No insurance company appears in any origin-trial participant list. One credible survey found checker tools now outnumber known implementations.</p>
+
+<p><strong>The analysts are unfriendly.</strong> Gartner expects more than 40% of agentic AI projects to be cancelled by end-2027, mostly for managerial rather than technical reasons. Celent found only 22% of insurers plan to have any agentic solution in place by the end of this year.</p>
+
+<p><strong>And the real competitor is not a startup.</strong> Applied Systems owns Epic and EZLynx (roughly 36% of agencies), IVANS (the download rail), Ask Kodiak (appetite), Tarmika (the leading commercial rater), and now Cytora (submission AI). They hold every piece of this except carrier cooperation, and their president is the one quoting the 30–50% no-quote figure in public. If this gets closed, the base case is that they close it from the inside.</p>
+
+<h2>What I would actually conclude</h2>
+
+<p>Two things, and they point in different directions.</p>
+
+<p><strong>For the contest entry, the aim is right.</strong> The demo is a professional desk, not a shopping experience — which is the defensible half of the thesis. It dramatizes the part of the problem that is genuinely hard: a missing FEIN, and two documents that disagree. And the shape we built, where the agent gathers and proposes but a person decides, is not only good design. It is turning into the <em>de facto legal architecture</em>. Every shipped example in this market stops short of bind or routes it to a licensed human, because no regulator has yet answered whether an AI agency needs appointment, who the responsible licensed producer is, or who earns the commission. Texas now requires a licensed human to review before a consequential action reaches a consumer or a carrier. We did not build to that rule, but we landed on it.</p>
+
+<div class="callout">
+  <div class="callout__h">The bet I would not make</div>
+  <p>I would not build a business whose value depends on WebMCP specifically. It is one transport, in origin trial, with an unresolved Apple problem and a well-funded incumbent better placed to route around it.</p>
+  <p>What is worth owning is the thing underneath: a structured submission record, deterministic appetite and completeness rules, document provenance, and a human-decision checkpoint with an audit trail. That asset is transport-agnostic. Expose it over WebMCP for the browser desk, over server-side MCP for ChatGPT, and over a plain API for anyone who asks. The transport argument resolves itself in a few years. The record and the rules are the part that keeps working either way.</p>
+</div>
+
+<p>Which is a comfortable conclusion for this entry, because that is what we built. The seven tools are a thin layer over a record and a rule set. If WebMCP dies tomorrow, the interesting part of this project does not.</p>
+
+</div>
+
+<div class="sources col">
+<h2>Where this comes from</h2>
+<ul>
+  <li><a href="https://www.globenewswire.com/news-release/2026/08/26/3351635/27604/en/agents-are-choosing-carriers-that-automate-submissions-say-findings-in-2026-insurance-agency-carrier-connectivity-trends-survey-report.html">Applied / Ivans, 2026 Agency-Carrier Connectivity Trends</a> — n=702 agents, the 74% / 90% / 76% / 49% / 79% figures</li>
+  <li><a href="https://www.iabforme.com/wp-content/uploads/2024/09/2024-State-of-Tech-Report.pdf">Catalyit State of Tech</a> — AMS and rater market share, n=441</li>
+  <li><a href="https://ezlynxsupport.freshdesk.com/support/solutions/articles/8000124674-commercial-lines-application-submission-workflow">EZLynx commercial submission workflow</a> — the PDF-and-email workflow, in the vendor's own docs</li>
+  <li><a href="https://www.heraldai.com/insurance-api-index">Herald Insurance API Index</a> — 86 carriers with any API product</li>
+  <li><a href="https://www.ivans.com/globalassets/all-documents/resources/brochures-data-sheets/ivans/details-on-ivans-download.pdf">IVANS Download datasheet</a> — "after you have bound"</li>
+  <li><a href="https://help.appulate.com/en/knowledge/appulate-for-carriers">Appulate A2X</a> — twenty years of bridging ACORD data into carrier portals</li>
+  <li><a href="https://www.insurancejournal.com/news/national/2025/09/09/838445.htm">Insurance Journal on Applied/Cytora</a> — the 30–50% no-quote quote</li>
+  <li><a href="https://riskandinsurance.com/wp-content/uploads/2021/12/TI-Accenture_PC_Underwriter_Survey-_vf.pdf">Accenture / The Institutes underwriter survey</a> — 39% of underwriter time non-core</li>
+  <li><a href="https://www.prnewswire.com/news-releases/insurify-expands-chatgpt-plugin-with-real-time-personalized-quotes-and-in-chat-shopping-302854708.html">Insurify in ChatGPT</a> — bindable quotes, 11 states, revenue +212%</li>
+  <li><a href="https://www.globenewswire.com/news-release/2026/07/30/3336040/0/en/plymouth-rock-assurance-is-the-first-u-s-carrier-to-offer-home-insurance-quoting-through-chatgpt.html">Plymouth Rock in ChatGPT</a> — first US carrier</li>
+  <li><a href="https://github.com/WebKit/standards-positions/issues/670">WebKit standards-positions #670</a> — open, zero comments, eight concerns labels</li>
+  <li><a href="https://webkit.org/tracking-prevention/">WebKit tracking prevention</a> — the sixteen declined APIs</li>
+  <li><a href="https://www.axios.com/2026/06/09/apple-siri-ai-agents-wwdc">Axios on Apple at WWDC 2026</a> — Federighi on "very early days"</li>
+  <li><a href="https://gs.statcounter.com/browser-market-share/mobile/united-states-of-america">StatCounter US browser share</a> — Safari 52% mobile, 11% desktop</li>
+  <li><a href="https://www.celent.com/en/insights/shedding-light-on-agentic-ai-in-insurance">Celent on agentic AI in insurance</a> — 22% of insurers by end-2026</li>
+  <li><a href="https://www.forbes.com/sites/robertszczerba/2026/07/07/why-40-of-agentic-ai-projects-may-be-canceled-by-2027/">Gartner via Forbes</a> — 40%+ cancellation forecast</li>
+  <li><a href="https://forc.org/Public/Public/Journals/2026/Articles/Fall/Vol36Ed3Article2.aspx">FORC Journal, Fall 2026</a> — appointment, DRLP and commission questions are unanswered</li>
+  <li><a href="https://www.pieinsurance.com/agency/workers-comp/underwriting-guidelines">Pie Insurance WC underwriting guidelines</a> — what refers a submission to a human</li>
+  <li><a href="https://www.forrester.com/blogs/agentic-ai-in-insurance-stop-chasing-autonomous-agents-start-engineering-trust/">Forrester on agentic AI in insurance</a> — the trust argument</li>
+  <li><a href="https://www.insurancejournal.com/magazines/mag-editorsnote/2026/07/13/877099.htm">Big "I" / AM Best market share</a> — 87.7% of commercial premium through independent agents</li>
+</ul>
+<p style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:var(--muted);margin-top:22px;max-width:66ch;">
+Two cautions on the evidence. The widely-quoted "84% of insurance quotes are abandoned" figure traces to a vendor page with no disclosed methodology and is not used here. And the small-commercial comparison content an agent would read today is already dominated by AI-generated affiliate SEO, which is itself a finding about what agentic shopping in this category currently consumes.
+</p>
+</div>
+
+</div>

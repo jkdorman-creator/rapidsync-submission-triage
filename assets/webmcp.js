@@ -15,7 +15,7 @@
 import { INBOX, LANES, state, evaluate, findSubmission, openSubmission, fieldLabel, fieldWhy, FIELD_KEYS } from './state.js';
 import {
   openSubmissionById, extractAttachment, setFields, askUnderwriter,
-  proposeRoute, logToolCall, setToolStatus,
+  proposeRoute, draftReply, logToolCall, setToolStatus,
 } from './ui.js';
 
 const money = n => `$${Number(n).toLocaleString()}`;
@@ -259,6 +259,32 @@ const TOOLS = [
         ? 'This matches what the rules say.'
         : `Note the rules currently put this in ${r.laneLabel}. Say why you disagree when you tell the user.`;
       return `Proposed ${LANES[key].label} on screen with your reasoning. ${agree} Nothing has been routed. Tell the user it is waiting for them to approve or reject it.`;
+    },
+  },
+  // -------------------------------------------------------------- 8
+  {
+    name: 'draft_reply',
+    title: 'Draft the reply to the producer',
+    description:
+      'Writes the email back to the producing agent asking for exactly what this submission still needs, and puts it on screen. It is not sent. The underwriter reads it, edits it if they want, and sends it themselves. Use after check_submission, once you know what is actually missing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject: { type: 'string', description: 'Subject line. Name the insured and the effective date.' },
+        body: { type: 'string', description: 'The email itself. List each thing needed as its own line, and say why it is needed.' },
+      },
+      required: ['subject', 'body'],
+    },
+    annotations: { readOnlyHint: false, untrustedContentHint: false },
+    async execute({ subject, body }) {
+      const sub = openSubmission();
+      if (!sub) return 'No submission is open. Call open_submission first.';
+      const s = String(subject || '').trim();
+      const b = String(body || '').trim();
+      if (!s || !b) return 'Pass both a subject and a body. The underwriter is going to read this before it goes out.';
+      draftReply(s, b);
+      logToolCall('draft_reply', `Drafted a reply to ${sub.agency}`, 'propose');
+      return `Drafted the reply to ${sub.from} and put it on screen with Send and Edit buttons. It has NOT been sent — you cannot send it. Tell the user it is waiting for them to read and send.`;
     },
   },
 ];

@@ -66,7 +66,7 @@ const tools = await page.evaluate(() => [...window.__tools.values()].map(t => ({
   params: Object.entries(t.inputSchema && t.inputSchema.properties ? t.inputSchema.properties : {})
     .map(([k, v]) => [k, (v.description || '').length]),
 })));
-check('7 tools registered', tools.length === 7, 'got ' + tools.length);
+check('8 tools registered', tools.length === 8, 'got ' + tools.length);
 check('tool status pill shows ready', (await page.textContent('#tool-status')).includes('ready'));
 for (const t of tools) {
   check('name <=30: ' + t.name, t.name.length <= 30, String(t.name.length));
@@ -194,6 +194,26 @@ await call('update_submission', {
 });
 const c4 = await call('check_submission');
 check('clean complete file lands in Quote Now', c4.includes('Quote Now') && c4.includes('ready to rate'));
+
+// ---- the agent drafts, a person sends ------------------------------------
+const draft = await call('draft_reply', { subject: 'Need one more year of loss runs', body: 'Hi Dana,\n\nPlease send the third year.\n\nJustin' });
+check('draft_reply says plainly it did not send', draft.includes('NOT been sent'));
+check('the draft is on screen', (await page.textContent('#reply')).includes('Please send the third year'));
+check('the draft names who it goes to', (await page.textContent('#reply')).includes('dwhitfield@prairiestate.example'));
+check('sending is a button, not a tool', (await page.textContent('#reply')).includes('Send it'));
+check('not sent until a person clicks', !(await page.textContent('#reply')).includes('Sent by you'));
+await page.click('#reply .btn--primary');
+await page.waitForTimeout(150);
+check('a person can send it', (await page.textContent('#reply')).includes('Sent by you'));
+
+const emptyDraft = await call('draft_reply', { subject: '', body: '' });
+check('an empty draft is refused', emptyDraft.includes('both a subject and a body'));
+
+// ---- the trust model is stated on the page -------------------------------
+check('the signed-in person is named in the header', (await page.textContent('.who')).includes('J. Dorman'));
+check('the page says the agent has no login', (await page.textContent('#limits')).includes('no password and no login'));
+check('the page lists what the agent cannot do', (await page.textContent('#limits')).includes('Route a submission'));
+check('the page says why the job is hard', (await page.textContent('.demobar')).includes('retype'));
 
 // ---- output budgets -------------------------------------------------------
 const outputs = { list_inbox: inbox, open_submission: opened, check_submission: c4, propose_routing: prop, ask_underwriter: ask };

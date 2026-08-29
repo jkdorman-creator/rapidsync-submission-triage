@@ -60,6 +60,9 @@ for (const scheme of ['light', 'dark']) {
     await page.evaluate(() => document.querySelector('[data-field="fein"]').scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(400);
     await page.screenshot({ path: 'test/screens/preview-handoff.png' });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: 'test/screens/preview-top.png' });
   }
 
   // nudging it before answering should be refused
@@ -88,6 +91,16 @@ for (const scheme of ['light', 'dark']) {
   await page.click('#routing .btn--primary');
   await page.waitForTimeout(300);
   check(`[${scheme}] human approval completes it`, (await page.textContent('#routing')).includes('Routed by the underwriter'));
+
+  await page.waitForSelector('#reply .btn--primary', { timeout: 25000 });
+  const replyText = await page.textContent('#reply');
+  check(`[${scheme}] the agent drafts the reply to the producer`, replyText.includes('loss run'));
+  check(`[${scheme}] the draft is not sent`, !replyText.includes('Sent by you'));
+  check(`[${scheme}] the page says the agent cannot send it`, replyText.includes('cannot send it'));
+  await page.click('#reply .btn--primary');
+  await page.waitForTimeout(200);
+  check(`[${scheme}] a person sends it`, (await page.textContent('#reply')).includes('Sent by you'));
+  check(`[${scheme}] the trust model is on the page`, (await page.textContent('#limits')).includes('no password and no login'));
   check(`[${scheme}] no page errors`, errs.length === 0, errs.slice(0, 2).join(' | '));
 
   if (scheme === 'dark') {

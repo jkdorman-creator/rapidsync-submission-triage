@@ -6,6 +6,7 @@
 import {
   FIELDS, FIELD_KEYS, INBOX, LANES, state, evaluate, findSubmission,
   openSubmission, resetRecord, fieldLabel, fieldWhy, isBlank, resolveConflict,
+  DESK_USER, AGENT_LIMITS,
 } from './state.js';
 
 // Money reads better with separators. State keeps whatever was written; only
@@ -62,6 +63,26 @@ function renderLog() {
 }
 
 // --- Inbox ------------------------------------------------------------------
+// The signed-in human, named in the header. The agent has no identity here: it
+// borrows this one, and every action it takes is logged against it.
+function renderWho() {
+  $('#who-name').textContent = `${DESK_USER.name} · ${DESK_USER.role}`;
+  $('#who-meta').textContent = `${DESK_USER.license} · signed in ${DESK_USER.signedInAt}`;
+}
+
+function renderLimits() {
+  const box = $('#limits');
+  if (box.dataset.done) return;   // static content, render once
+  box.dataset.done = '1';
+  const lead = el('p', 'limits__lead',
+    'It has no password and no login of its own. It works inside the session you opened, '
+    + 'with your permissions, and everything it does is logged under your name.');
+  box.append(lead);
+  const ul = el('ul', 'limits__list');
+  for (const line of AGENT_LIMITS) ul.append(el('li', null, line));
+  box.append(ul);
+}
+
 function renderInbox() {
   const list = $('#inbox');
   list.innerHTML = '';
@@ -265,6 +286,53 @@ export function rejectRoute() {
   logToolCall('(underwriter)', `Rejected routing to ${LANES[state.proposal.lane].label}`, 'human');
   state.proposal = null;
   render();
+}
+
+// --- The reply the agent writes and a person sends --------------------------
+export function draftReply(subject, body) {
+  state.reply = { subject, body, at: new Date() };
+  state.replySent = null;
+  render();
+  return state.reply;
+}
+
+function sendReply() {
+  if (!state.reply) return;
+  state.replySent = new Date();
+  logToolCall('(underwriter)', 'Sent the reply to the producer', 'human');
+  render();
+}
+
+function renderReply() {
+  const box = $('#reply');
+  box.innerHTML = '';
+  if (!state.reply) {
+    box.append(el('p', 'muted', 'Nothing drafted yet.'));
+    return;
+  }
+  const sub = openSubmission();
+  box.append(el('div', 'reply__to', `To: ${sub ? sub.from : ''}`));
+  box.append(el('div', 'reply__subject', state.reply.subject));
+  box.append(el('pre', 'reply__body', state.reply.body));
+  if (state.replySent) {
+    box.append(el('div', 'reply__sent', `Sent by you at ${state.replySent.toLocaleTimeString()}`));
+    return;
+  }
+  const actions = el('div', 'reply__actions');
+  const send = el('button', 'btn btn--primary', 'Send it');
+  send.type = 'button';
+  send.addEventListener('click', sendReply);
+  const edit = el('button', 'btn btn--ghost', 'Edit first');
+  edit.type = 'button';
+  edit.addEventListener('click', () => {
+    const pre = box.querySelector('.reply__body');
+    pre.contentEditable = 'true';
+    pre.focus();
+    pre.classList.add('reply__body--editing');
+  });
+  actions.append(send, edit);
+  box.append(actions);
+  box.append(el('p', 'reply__note', 'Your agent wrote this. It cannot send it.'));
 }
 
 // --- Record form ------------------------------------------------------------
@@ -541,11 +609,14 @@ function focusField(key) {
 }
 
 export function render() {
+  renderWho();
+  renderLimits();
   renderActionBar();
   renderInbox();
   renderEmail();
   renderRecord();
   renderRules();
+  renderReply();
 }
 
 export function setToolStatus(text, ok = true) {
