@@ -112,7 +112,7 @@ Every tool is a thin wrapper over a function the underwriter's own buttons call 
 - **Errors are returned, not thrown.** A bad submission id comes back as *"No submission with id X. Call list_inbox for the valid ids."* A model can recover from that. A rejected promise gives it nothing.
 - **The UI updates before the tool returns.** Agents read the screen to decide what's next; returning early makes them act on stale state.
 - **Unknown fields are reported back**, with the valid names, rather than silently dropped.
-- **Settling a contradiction is not exposed as a tool.** The agent can see that one is open and that a person settled it, but there is no `resolve_conflict` for it to call. That is deliberate.
+- **Settling a contradiction is not exposed as a tool — and cannot be worked around.** There is no `resolve_conflict` for the agent to call, and while one is open, `update_submission` locks the fields it rests on, so the agent cannot dissolve the disagreement by overwriting the application's answer. Only the two buttons on the underwriter's screen settle it. That is deliberate, and tested.
 - **The input schema names every field explicitly** with a one-line hint each, so the model isn't guessing key names — and it asks for nothing about a person. Every field is a business underwriting fact taken from a document.
 - **Tool budgets respected**: names ≤ 30 characters, descriptions ≤ 500, parameter descriptions ≤ 150, outputs ≤ 1,500. Enforced by the test suite.
 - **PDF.js is vendored, not loaded from a CDN**, and it loads lazily — a slow or blocked third party can't stop the tools from registering.

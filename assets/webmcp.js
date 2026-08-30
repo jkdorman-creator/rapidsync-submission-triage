@@ -150,14 +150,26 @@ const TOOLS = [
         return `"${src}" is not an attachment on ${sub.id}. Available: ${sub.attachments.map(a => a.id).join(', ')}. Send the values again with the right id, or leave source_document out.`;
       }
       delete values.source_document;
+      // While the loss contradiction is open, the two fields it rests on are
+      // locked to the agent. Rewriting them would dissolve the disagreement
+      // without a person ever deciding it — the exact thing this desk exists
+      // to prevent. Only the buttons on the underwriter's screen settle it.
+      const conflictOpen = evaluate().conflicts.some(c => c.code === 'LOSS_DISCLOSURE_MISMATCH');
+      const locked = [];
+      if (conflictOpen) {
+        for (const k of ['losses_on_app', 'loss_run_claims']) {
+          if (k in values) { locked.push(fieldLabel(k)); delete values[k]; }
+        }
+      }
       const { applied, rejected } = setFields(values, doc ? doc.name : 'agent');
       logToolCall('update_submission', applied.length
         ? `Wrote ${applied.length} field${applied.length === 1 ? '' : 's'} — ${applied.slice(0, 3).map(fieldLabel).join(', ')}${applied.length > 3 ? ` and ${applied.length - 3} more` : ''}`
         : 'Nothing written');
       const parts = [];
       if (applied.length) parts.push(`Wrote ${applied.length} field${applied.length === 1 ? '' : 's'}: ${applied.map(fieldLabel).join(', ')}.`);
+      if (locked.length) parts.push(`LOCKED: ${locked.join(', ')} cannot be changed while the loss contradiction is open. Only the underwriter can settle it — the two buttons are on their screen. Tell them it is waiting.`);
       if (rejected.length) parts.push(`Ignored unknown field${rejected.length === 1 ? '' : 's'}: ${rejected.join(', ')}. Valid names: ${FIELD_KEYS.join(', ')}.`);
-      if (!applied.length && !rejected.length) parts.push('Every value sent was empty, so nothing changed.');
+      if (!applied.length && !rejected.length && !locked.length) parts.push('Every value sent was empty, so nothing changed.');
       parts.push('Run check_submission to see where this leaves the file.');
       return parts.join(' ');
     },

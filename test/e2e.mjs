@@ -134,6 +134,15 @@ check('the refusal redirects to the producer', wrongAsk.includes('draft_reply'))
 check('no question panel was opened by the refused ask', await page.locator('#question').isHidden());
 
 // A genuine judgment call is what ask_underwriter is for.
+// The agent must not be able to dissolve the contradiction by overwriting the
+// fields it rests on. While it is open, they are locked.
+const sneak = await call('update_submission', { losses_on_app: 'yes' });
+check('overwriting the disputed answer is locked', sneak.includes('LOCKED'));
+check('the lock names who can settle it', sneak.includes('Only the underwriter'));
+check('the record kept the application answer', (await page.inputValue('#f-losses_on_app')) === 'no');
+const still = await call('check_submission');
+check('the contradiction survives the attempt', still.includes('CONTRADICTION'));
+
 const ask = await call('ask_underwriter', { field: 'losses_on_app', question: 'Which document should I go with on the losses?' });
 check('ask_underwriter returns the words to say', ask.includes('Say this to the user'));
 check('ask_underwriter supplies the reason without being told', ask.includes('stays on the file'));
