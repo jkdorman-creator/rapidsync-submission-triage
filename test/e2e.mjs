@@ -244,6 +244,22 @@ for (const [n, o] of Object.entries(outputs)) {
 check('activity log recorded the tool calls', (await page.textContent('#activity')).includes('check_submission'));
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 
+// ---- the Codex case: execute() called with no options argument ------------
+// Seen live: Codex invokes tool callbacks with only the input object. Every
+// tool must survive that — especially read_attachment, which is the only one
+// that touches the second parameter.
+{
+  const oneArg = await page.evaluate(async () => {
+    const out = {};
+    await window.__tools.get('open_submission').execute({ submission_id: 'SUB-4502' });
+    out.read = await window.__tools.get('read_attachment').execute({ attachment_id: 'ATT-4502-B' });
+    out.check = await window.__tools.get('check_submission').execute({});
+    return out;
+  });
+  check('read_attachment survives a one-argument call', oneArg.read.includes('92,400'));
+  check('the rest of the loop follows', oneArg.check.includes('lane'));
+}
+
 // ---- the Codex case: a pane that blocks the PDF engine --------------------
 // Seen live in ChatGPT/Codex's browser pane: PDF.js cannot start its worker.
 // read_attachment must still return the documents via the build-time text.

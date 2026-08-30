@@ -108,7 +108,14 @@ const TOOLS = [
       required: ['attachment_id'],
     },
     annotations: { readOnlyHint: true, untrustedContentHint: true },
-    async execute({ attachment_id }, { signal }) {
+    // NOTE the defensive second parameter. The spec says execute is called with
+    // an options object carrying an AbortSignal — Chrome does. Codex's browser
+    // pane calls it with no second argument at all, and destructuring { signal }
+    // from undefined threw before the try below could catch anything. This was
+    // the only tool of the eight taking that parameter, and the only one that
+    // failed under a real agent. Never assume the optional parts of a young spec.
+    async execute({ attachment_id }, options) {
+      const signal = options && options.signal;
       const sub = openSubmission();
       if (!sub) return 'No submission is open. Call open_submission first.';
       const id = String(attachment_id || '').trim();
@@ -118,7 +125,7 @@ const TOOLS = [
       }
       try {
         const text = await extractAttachment(id);
-        if (signal.aborted) return 'Cancelled.';
+        if (signal && signal.aborted) return 'Cancelled.';
         logToolCall('read_attachment', `${att.name} — ${text.length} characters extracted`);
         return `${att.name} (${att.kind}), text as printed on the document:\n\n${text}`;
       } catch (err) {

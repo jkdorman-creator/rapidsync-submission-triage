@@ -387,7 +387,13 @@ function renderRisk() {
   const has = k => !isBlank(rec[k]);
 
   const head = el('div', 'risk__head');
-  const name = el('div', 'risk__name', has('named_insured') ? rec.named_insured : 'No submission open');
+  // Three states, not two: no file open, a file open whose name has not been
+  // read yet, and a named risk. Collapsing the middle one into "No submission
+  // open" made the page look broken next to a half-filled record.
+  const label = !state.openSubmissionId ? 'No submission open'
+    : has('named_insured') ? rec.named_insured
+    : 'Named insured not read yet';
+  const name = el('div', 'risk__name', label);
   if (!has('named_insured')) name.classList.add('risk__name--empty');
   head.append(name);
   if (r) {
@@ -400,7 +406,7 @@ function renderRisk() {
   sub.textContent = has('governing_class')
     ? `Class ${rec.governing_class}${has('class_description') ? ' · ' + rec.class_description : ''}`
       + `${has('state') ? ' · ' + rec.state : ''}`
-    : 'Class and operations not read yet';
+    : (state.openSubmissionId ? 'Class and operations not read yet' : 'Pick a submission to begin');
   box.append(sub);
 
   const stats = el('div', 'risk__stats');
