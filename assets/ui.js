@@ -705,6 +705,7 @@ function focusField(key) {
 }
 
 export function render() {
+  renderLog();
   renderWho();
   renderLimits();
   renderActionBar();

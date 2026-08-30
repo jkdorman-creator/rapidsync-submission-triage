@@ -13,14 +13,21 @@ import { render } from './ui.js';
 import { TOOLS } from './webmcp.js';
 
 // ---------------------------------------------------------------------------
-// Scripted agent, hosted preview only. Three replays, one per lane. Each calls
-// the registered tools exactly the way ChatGPT's browser does, and each one
-// stops at the point a person has to decide. Nothing advances until you act.
+// Three replays, one per lane. Each calls the registered tools exactly the way
+// ChatGPT's browser does, and each one stops at the point a person has to
+// decide. Nothing advances until you act.
 // ---------------------------------------------------------------------------
 const transcript = document.getElementById('transcript');
 const resetBtn = document.getElementById('reset');
 const playButtons = [...document.querySelectorAll('[data-play]')];
 let running = false;
+
+// A replay must die cleanly if the person resets or opens another submission
+// mid-run — otherwise a half-finished script keeps writing onto the wrong file.
+// Every pause checks this generation counter and bails when it has moved on.
+let generation = 0;
+const CANCELLED = Symbol('replay cancelled');
+function cancelActiveRun() { generation++; }
 
 function say(who, text, pending = false) {
   const turn = document.createElement('div');
@@ -37,16 +44,22 @@ function say(who, text, pending = false) {
   return turn;
 }
 
-const wait = ms => new Promise(r => setTimeout(r, ms));
+const wait = ms => {
+  const g = generation;
+  return new Promise((resolve, reject) => setTimeout(
+    () => (g === generation ? resolve() : reject(CANCELLED)), ms));
+};
 
 // Waits for the person to actually do the thing, and says something if they
 // look stuck. This is the whole point of the demo, so it never times out.
 function waitFor(done, nudge) {
-  return new Promise(resolve => {
+  const g = generation;
+  return new Promise((resolve, reject) => {
     if (done()) return resolve();
     let nudged = false;
     const started = Date.now();
     const tick = setInterval(() => {
+      if (g !== generation) { clearInterval(tick); return reject(CANCELLED); }
       if (done()) { clearInterval(tick); return resolve(); }
       if (!nudged && nudge && Date.now() - started > 9000) {
         nudged = true;
@@ -75,6 +88,7 @@ function setBusy(on, activeKey) {
 }
 
 function resetAll() {
+  cancelActiveRun();
   transcript.innerHTML = '';
   state.openSubmissionId = null;
   state.log = [];
@@ -205,25 +219,30 @@ async function playProblem() {
   );
 
   const settled = Object.values(state.resolutions)[0];
-  say('you', settled ? `I went with the ${settled.trusted === 'loss_run' ? 'loss run' : 'application'}.` : 'Settled.');
+  const usedLossRun = !settled || settled.trusted === 'loss_run';
+  say('you', settled ? `I went with the ${usedLossRun ? 'loss run' : 'application'}.` : 'Settled.');
   await wait(700);
 
   t = say('agent', 'Thanks. Re-running the rules…', true);
   await run('check_submission');
   await wait(800); t.remove();
-  say('agent', 'That settles it, and both answers stay on the file so it is clear what each document said. Two things are still missing and neither is on this page — the FEIN, and the third year of loss runs. So we can indicate, not quote.');
+  say('agent', usedLossRun
+    ? 'That settles it, and both answers stay on the file so it is clear what each document said. Two things are still missing and neither is on this page — the FEIN, and the third year of loss runs. So we can indicate, not quote.'
+    : 'That settles it, and both answers stay on the file so it is clear what each document said. Since the loss run does not belong to this risk, we need the right one — plus the FEIN. So we can indicate, not quote.');
   await wait(1600);
 
   await run('propose_routing', {
     lane: 'indication',
-    rationale: 'In appetite: class 2802, mod 1.18, $92,400 incurred — all inside the guidelines. Missing the FEIN and the third year of loss runs, both of which have to come from the producer, so we can price a ballpark but not firm it up yet.',
+    rationale: usedLossRun
+      ? 'In appetite: class 2802, mod 1.18, $92,400 incurred — all inside the guidelines. Missing the FEIN and the third year of loss runs, both of which have to come from the producer, so we can price a ballpark but not firm it up yet.'
+      : 'In appetite on class 2802 and mod 1.18. You set the attached loss run aside as belonging to a different entity or period, so we need the correct loss runs and the FEIN from the producer before this can firm up past a ballpark.',
   });
   say('agent', 'Indication is on screen with my reasoning. Approve it and I will write to Priya for the two things we need.');
   await waitFor(approved, 'Still waiting on you. Approve and route is on the Routing decision card.');
   await wait(600);
 
   t = say('agent', 'Writing the reply to Priya so you do not have to…', true);
-  await run('draft_reply', {
+  await run('draft_reply', usedLossRun ? {
     subject: 'Cascade Millwork Inc. — 10/1 effective — indication, and one item needed to quote',
     body: `Hi Priya,
 
@@ -241,6 +260,23 @@ WORTH FLAGGING TO THE INSURED
 3. The application answers "no losses in the past 3 years." The attached Midwest Indemnity loss run shows 4 claims and $92,400 incurred for 10/01/2024 to 07/15/2026, including a lost-time amputation. We are going with the loss run. Worth correcting on their end so the next application is right.
 
 Send those two over and we will turn this around quickly.
+
+Justin`,
+  } : {
+    subject: 'Cascade Millwork Inc. — 10/1 effective — indication, pending corrected loss runs',
+    body: `Hi Priya,
+
+Thanks for sending Cascade Millwork over. We can put an indication together now, but the loss documentation needs to be sorted out before we can firm it into a quote.
+
+WHAT WE CAN DO NOW
+Indication only, based on class 2802, $2,692,000 payroll and mod 1.18.
+
+WHAT WE NEED FROM YOU TO QUOTE
+1. Corrected loss runs. The Midwest Indemnity report attached does not appear to belong to this risk or this period, so we have set it aside — per the application, which reports no losses. Please confirm with Midwest Indemnity and send loss runs for the correct entity, covering three policy years, valued within the last 90 days.
+
+2. The FEIN. The application left it blank and we cannot rate or file without it — and it is also how we will confirm whose loss runs those are.
+
+Send those over and we will turn this around quickly.
 
 Justin`,
   });
@@ -312,17 +348,32 @@ const SCENARIOS = { clean: playClean, problem: playProblem, decline: playDecline
 
 async function play(key) {
   if (running) return;
+  cancelActiveRun();
+  const myGen = generation;
   setBusy(true, key);
   transcript.innerHTML = '';
   state.log = [];
+  state.openSubmissionId = null;
   resetRecord();
   render();
   try {
     await SCENARIOS[key]();
+  } catch (err) {
+    if (err !== CANCELLED) throw err;
   } finally {
-    setBusy(false, key);
+    if (myGen === generation) setBusy(false, key);
   }
 }
+
+// Opening a submission by hand while a replay is running means the person has
+// taken the desk back. Stop the script rather than fighting them for it.
+document.getElementById('inbox').addEventListener('click', () => {
+  if (running) {
+    cancelActiveRun();
+    setBusy(false, null);
+    say('agent', 'Stopped — you took over. Work it yourself, or pick a replay to start again.');
+  }
+}, true);
 
 for (const btn of playButtons) {
   btn.addEventListener('click', () => play(btn.dataset.play));

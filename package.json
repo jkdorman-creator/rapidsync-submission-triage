@@ -7,8 +7,7 @@
   "type": "module",
   "scripts": {
     "start": "npx serve .",
-    "test": "node test/e2e.mjs .",
-    "screens": "node test/shot.mjs"
+    "test": "node test/e2e.mjs . && node test/preview.mjs"
   },
   "devDependencies": {
     "playwright": "^1.50.0"

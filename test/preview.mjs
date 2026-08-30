@@ -146,6 +146,43 @@ for (const scheme of ['light', 'dark']) {
   check(tag('a person sends it'), (await page.textContent('#reply')).includes('Sent by you'));
   check(tag('no page errors'), errs.length === 0, errs.slice(0, 2).join(' | '));
 
+  if (scheme === 'light') {
+    // ---- 4. the OTHER answer to the contradiction --------------------------
+    // A judge has a coin-flip chance of clicking "Use the application". The
+    // drafted reply must match their choice, not assume the loss run.
+    await page.click('[data-play="problem"]');
+    await page.waitForSelector('.conflict .btn--choice', { timeout: 30000 });
+    await page.locator('.conflict .btn--choice').nth(1).click();   // Use the application
+    await page.waitForSelector('#routing .btn--primary', { timeout: 30000 });
+    await page.click('#routing .btn--primary');
+    await page.waitForSelector('#reply .btn--primary', { timeout: 30000 });
+    const otherReply = await page.textContent('#reply');
+    check(tag('picking the application changes the reply'), /Corrected loss runs/.test(otherReply));
+    check(tag('it does not claim the loss run was used'), !/We are going with the loss run/.test(otherReply));
+    check(tag('it still asks for the FEIN'), /The FEIN/.test(otherReply));
+
+    // ---- 5. cancellation ---------------------------------------------------
+    // Reset mid-run kills the script instead of leaving a ghost writing.
+    await page.click('[data-play="clean"]');
+    await page.waitForTimeout(1200);
+    await page.click('#reset');
+    await page.waitForTimeout(2500);
+    const rows = await page.locator('#transcript .turn').count();
+    check(tag('reset mid-run stops the replay'), rows === 1,
+      'transcript rows after reset: ' + rows);
+    check(tag('reset clears the activity log'), (await page.textContent('#activity')).includes('No tool calls yet'));
+    check(tag('buttons come back after reset'), !(await page.locator('[data-play="clean"]').isDisabled()));
+
+    // Taking over by clicking the queue also stops it.
+    await page.click('[data-play="decline"]');
+    await page.waitForTimeout(1200);
+    await page.click('.mail');
+    await page.waitForTimeout(2500);
+    check(tag('opening a submission by hand stops the replay'),
+      (await page.textContent('#transcript')).includes('you took over'));
+    check(tag('and hands the buttons back'), !(await page.locator('[data-play="clean"]').isDisabled()));
+  }
+
   if (scheme === 'dark') await page.screenshot({ path: 'test/screens/preview-done-dark.png' });
   await page.close();
 }

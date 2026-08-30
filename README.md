@@ -6,7 +6,7 @@ Built by [RapidSync Specialty](https://rapidsyncspecialty.com) for the OpenAI We
 
 > Everything in the demo is invented. No real business, producer, document, or claim is represented.
 
-![The triage desk mid-scenario: the agent has read both attachments, filled the record, hit a contradiction between the application and the loss run, asked the underwriter for the missing FEIN, and proposed a routing lane that is waiting on a human click.](screenshots/desk.png)
+![The triage desk mid-scenario: the record filled and credited per document, the risk summary carrying the deciding numbers, and the contradiction card quoting the exact line from each document with the two buttons only a person can press.](screenshots/desk.png)
 
 ---
 
@@ -163,8 +163,6 @@ npm test
 ```
 
 `test/e2e.mjs` stubs `document.modelContext`, drives all seven tools the way an agent would, and walks the full scenario end to end — including the handoff to the human and back. It also asserts every tool stays inside the character budgets. 59 checks.
-
-`test/shot.mjs` writes screenshots of the desk mid-scenario in both light and dark.
 
 `test/preview.mjs` drives the hosted preview end to end — presses play, checks the contradiction is
 shown with its receipts, settles it, and confirms it resumes to a routing proposal and a drafted reply. 118 checks.

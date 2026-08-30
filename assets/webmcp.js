@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // webmcp.js — the entire agent-facing surface of this app.
 //
-// Seven tools. Each one is a thin wrapper over a function the underwriter's own
+// Eight tools. Each one is a thin wrapper over a function the underwriter's own
 // buttons call, so the agent and the person are driving the same desk.
 //
 // Design rules followed here, from Chrome's WebMCP guidance:
@@ -17,8 +17,6 @@ import {
   openSubmissionById, extractAttachment, setFields, askUnderwriter,
   proposeRoute, draftReply, logToolCall, setToolStatus,
 } from './ui.js';
-
-const money = n => `$${Number(n).toLocaleString()}`;
 
 // Every field the agent may write, with a short hint each. Explicit beats a
 // free-form bag: the model guesses far less.
@@ -140,7 +138,8 @@ const TOOLS = [
     annotations: { readOnlyHint: false, untrustedContentHint: false },
     async execute(input) {
       if (!openSubmission()) return 'No submission is open. Call open_submission first.';
-      const values = input && typeof input === 'object' ? input : {};
+      // Copy before touching: the input object belongs to the caller.
+      const values = input && typeof input === 'object' ? { ...input } : {};
       if (Object.keys(values).filter(k => k !== 'source_document').length === 0) {
         return 'Nothing sent. Pass at least one field, for example {"named_insured": "Acme Inc."}.';
       }
