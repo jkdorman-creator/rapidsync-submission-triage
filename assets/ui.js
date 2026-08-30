@@ -41,7 +41,12 @@ const el = (tag, cls, text) => {
 
 // --- Activity log -----------------------------------------------------------
 export function logToolCall(name, detail, kind = 'call') {
-  if (detail && detail.length > 90) detail = detail.slice(0, 87).replace(/,?\s*[^,]*$/, '') + '…';
+  if (detail && detail.length > 90) {
+    // Trim at the last comma when that leaves something readable; a comma-less
+    // string must never be swallowed whole.
+    const cut = detail.slice(0, 87).replace(/,\s*[^,]*$/, '');
+    detail = (cut.length >= 30 ? cut : detail.slice(0, 87)) + '…';
+  }
   state.log.unshift({ name, detail, kind, at: new Date() });
   state.log = state.log.slice(0, 40);
   renderLog();
@@ -214,22 +219,36 @@ export async function extractAttachment(attachmentId) {
   if (!sub) throw new Error('no submission open');
   const att = sub.attachments.find(a => a.id === attachmentId);
   if (!att) throw new Error('no such attachment');
-  const pdfjs = await loadPdfjs();
-  const doc = await pdfjs.getDocument(att.url).promise;
-  const chunks = [];
-  for (let p = 1; p <= doc.numPages; p++) {
-    const page = await doc.getPage(p);
-    const content = await page.getTextContent();
-    let line = [], lastY = null;
-    for (const item of content.items) {
-      const y = Math.round(item.transform[5]);
-      if (lastY !== null && Math.abs(y - lastY) > 2) { chunks.push(line.join(' ')); line = []; }
-      line.push(item.str);
-      lastY = y;
+  let text;
+  try {
+    const pdfjs = await loadPdfjs();
+    const doc = await pdfjs.getDocument(att.url).promise;
+    const chunks = [];
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const content = await page.getTextContent();
+      let line = [], lastY = null;
+      for (const item of content.items) {
+        const y = Math.round(item.transform[5]);
+        if (lastY !== null && Math.abs(y - lastY) > 2) { chunks.push(line.join(' ')); line = []; }
+        line.push(item.str);
+        lastY = y;
+      }
+      if (line.length) chunks.push(line.join(' '));
     }
-    if (line.length) chunks.push(line.join(' '));
+    text = chunks.map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+  } catch (err) {
+    // Some embedded browser panes (agent sandboxes especially) block the
+    // background worker PDF.js needs. Fall back to the same parser's output,
+    // produced at build time from these exact files — and say so, in the log,
+    // rather than quietly pretending the live parse worked.
+    const resp = await fetch(new URL('../docs/extracted-text.json', import.meta.url));
+    if (!resp.ok) throw err;
+    const baked = await resp.json();
+    text = baked[attachmentId];
+    if (!text) throw err;
+    logToolCall('read_attachment', `PDF engine blocked — using build-time text for ${att.name}`, 'error');
   }
-  const text = chunks.map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
   state.documents[attachmentId] = { name: att.name, kind: att.kind, text };
   return text;
 }

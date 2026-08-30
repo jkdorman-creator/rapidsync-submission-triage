@@ -115,7 +115,7 @@ Every tool is a thin wrapper over a function the underwriter's own buttons call 
 - **Settling a contradiction is not exposed as a tool — and cannot be worked around.** There is no `resolve_conflict` for the agent to call, and while one is open, `update_submission` locks the fields it rests on, so the agent cannot dissolve the disagreement by overwriting the application's answer. Only the two buttons on the underwriter's screen settle it. That is deliberate, and tested.
 - **The input schema names every field explicitly** with a one-line hint each, so the model isn't guessing key names — and it asks for nothing about a person. Every field is a business underwriting fact taken from a document.
 - **Tool budgets respected**: names ≤ 30 characters, descriptions ≤ 500, parameter descriptions ≤ 150, outputs ≤ 1,500. Enforced by the test suite.
-- **PDF.js is vendored, not loaded from a CDN**, and it loads lazily — a slow or blocked third party can't stop the tools from registering.
+- **PDF.js is vendored, not loaded from a CDN**, and it loads lazily — a slow or blocked third party can't stop the tools from registering. Some agent browser panes block the background worker PDF.js needs (ChatGPT/Codex's pane does); when the live parse fails, `read_attachment` serves the same parser's build-time output for these exact files, and discloses the substitution in the activity log rather than quietly pretending.
 
 ### The rules
 

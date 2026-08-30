@@ -244,6 +244,28 @@ for (const [n, o] of Object.entries(outputs)) {
 check('activity log recorded the tool calls', (await page.textContent('#activity')).includes('check_submission'));
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 
+// ---- the Codex case: a pane that blocks the PDF engine --------------------
+// Seen live in ChatGPT/Codex's browser pane: PDF.js cannot start its worker.
+// read_attachment must still return the documents via the build-time text.
+{
+  const p2 = await browser.newPage();
+  await p2.route('**/vendor/pdf*', route => route.abort());
+  await p2.addInitScript(STUB);
+  await p2.goto(base, { waitUntil: 'domcontentloaded' });
+  await p2.waitForTimeout(800);
+  const call2 = (n, i) => p2.evaluate(([n, i]) => document.modelContext.executeTool(n, i), [n, i]);
+  await call2('open_submission', { submission_id: 'SUB-4502' });
+  const blockedRead = await call2('read_attachment', { attachment_id: 'ATT-4502-B' });
+  check('PDF-blocked pane still reads the loss run', blockedRead.includes('92,400') && blockedRead.includes('MW-784120'));
+  check('the fallback is disclosed in the activity log',
+    (await p2.textContent('#activity')).includes('PDF engine blocked'));
+  await call2('read_attachment', { attachment_id: 'ATT-4502-A' });
+  await call2('update_submission', { losses_on_app: 'no', loss_run_claims: 4, source_document: 'ATT-4502-B' });
+  const blockedCheck = await call2('check_submission');
+  check('the contradiction still fires without the PDF engine', blockedCheck.includes('CONTRADICTION'));
+  await p2.close();
+}
+
 await browser.close();
 server.close();
 
